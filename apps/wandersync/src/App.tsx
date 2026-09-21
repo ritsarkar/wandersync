@@ -848,6 +848,35 @@ export const App: React.FC = () => {
         </button>
       )}
 
+      {/* ================================================================= */}
+      {/* FLOATING CORNER CONTROLS: Apple-Grade GO / Cancel Trip Engine     */}
+      {/* ================================================================= */}
+      {isJoined && (
+        <div className="fixed bottom-22 left-3.5 sm:bottom-8 sm:left-6 z-40 pointer-events-auto select-none">
+          {!isTripActive && !activeCountdown ? (
+            <button
+              type="button"
+              onClick={handleInitiateStartTrip}
+              className="apple-pressable px-5 py-3 rounded-full bg-gradient-to-r from-[#34C759] to-[#28CD41] hover:from-[#2fb350] hover:to-[#22b337] text-white font-extrabold text-sm tracking-wider shadow-2xl shadow-emerald-500/40 border-t border-white/40 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+              title="Start Convoy Trip (GO)"
+            >
+              <span className="text-lg">🚀</span>
+              <span className="uppercase font-black text-sm tracking-widest">GO</span>
+            </button>
+          ) : isTripActive ? (
+            <button
+              type="button"
+              onClick={handleExitTrip}
+              className="apple-pressable px-4 py-2.5 rounded-full apple-glass-pill bg-rose-950/70 hover:bg-rose-900/90 text-[#FF3B30] border border-rose-500/40 font-bold text-xs flex items-center gap-2 shadow-2xl shadow-black/50 cursor-pointer active:scale-95 transition-all"
+              title="Cancel Current Trip Navigation"
+            >
+              <span className="text-sm">🛑</span>
+              <span className="font-bold">Cancel Trip</span>
+            </button>
+          ) : null}
+        </div>
+      )}
+
       {/* Ultra-Simple, Human-Friendly Travel Controls - Render only when NOT on active trip */}
       {!isTripActive && (
         <SimpleTravelerUI

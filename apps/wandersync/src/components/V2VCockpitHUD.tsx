@@ -340,15 +340,15 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
               <span className="hidden sm:inline">{is3DTiltActive ? '3D' : '2D'}</span>
             </button>
 
-            {/* Exit Drive Mode Button */}
+            {/* Cancel Trip Button */}
             <button
               type="button"
               onClick={onExitTrip}
-              className="px-3 py-1.5 sm:py-2 rounded-2xl apple-glass-pill hover:bg-rose-500/20 text-[#FF3B30] font-bold text-[11px] sm:text-xs flex items-center gap-1.5 apple-pressable cursor-pointer"
-              title="Exit drive mode back to squad overview"
+              className="px-3 py-1.5 sm:py-2 rounded-2xl apple-glass-pill bg-rose-950/40 hover:bg-rose-900/60 text-[#FF3B30] border border-rose-500/40 font-bold text-[11px] sm:text-xs flex items-center gap-1.5 apple-pressable cursor-pointer shadow-lg shadow-black/40"
+              title="Cancel trip and return to squad overview"
             >
-              <X className="w-4 h-4" />
-              <span className="hidden sm:inline">Exit</span>
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF3B30]" />
+              <span className="font-bold">Cancel Trip</span>
             </button>
           </div>
         </div>

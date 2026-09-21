@@ -1252,29 +1252,15 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Expand or Start Trip Button */}
-                {onToggleTripActive && rendezvous ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleTripActive();
-                    }}
-                    className="w-9 h-9 rounded-full bg-[#007AFF] text-white font-bold text-sm shadow-lg shadow-blue-500/30 border-t border-white/30 flex items-center justify-center apple-pressable"
-                    title="Start Trip"
-                  >
-                    <span>🚀</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => mobileSheet.snapTo('half')}
-                    className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center border border-white/15 apple-pressable"
-                    title="Open routes"
-                  >
-                    <ChevronUp className="w-4 h-4 text-blue-400" />
-                  </button>
-                )}
+                {/* Right: Expand Drawer Button */}
+                <button
+                  type="button"
+                  onClick={() => mobileSheet.snapTo('half')}
+                  className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center border border-white/15 apple-pressable"
+                  title="Open routes & squad"
+                >
+                  <ChevronUp className="w-4 h-4 text-blue-400" />
+                </button>
               </div>
             )}
 
@@ -1305,17 +1291,6 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
           {/* Expanded Content Drawer */}
           {isMobileDrawerOpen && (
             <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-3 apple-scroll-fade-top">
-              {/* Primary Convoy Start Action Button */}
-              {onToggleTripActive && (
-                <button
-                  onClick={onToggleTripActive}
-                  className="w-full py-3 px-4 rounded-2xl font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2.5 bg-[#007AFF] text-white border-t border-white/30 shadow-blue-500/30 apple-pressable cursor-pointer"
-                >
-                  <span className="text-lg">🚀</span>
-                  <span className="uppercase font-extrabold tracking-wider">GO</span>
-                </button>
-              )}
-
               {/* 3 Native Segmented Tabs: Routes | Squad | Road Stops */}
               <div className="apple-segmented-track mb-3">
                 <button
