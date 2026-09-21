@@ -3,18 +3,18 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 export type SheetDetent = 'peek' | 'half' | 'full';
 
 interface FluidSheetOptions {
-  peekHeight?: number;       // default: 76px
-  halfRatio?: number;        // default: 0.46 of viewport
-  fullRatio?: number;        // default: 0.88 of viewport
+  peekHeight?: number;       // default: 84px
+  halfRatio?: number;        // default: 0.62 of viewport (taller mobile menu)
+  fullRatio?: number;        // default: 0.93 of viewport
   initialDetent?: SheetDetent;
   onDetentChange?: (detent: SheetDetent) => void;
 }
 
 export function useFluidSheet(options: FluidSheetOptions = {}) {
   const {
-    peekHeight = 76,
-    halfRatio = 0.46,
-    fullRatio = 0.88,
+    peekHeight = 84,
+    halfRatio = 0.62,
+    fullRatio = 0.93,
     initialDetent = 'peek',
     onDetentChange,
   } = options;

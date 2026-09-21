@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR } from '../types';
-import { CornerUpLeft, CornerUpRight, Navigation } from 'lucide-react';
+import { CornerUpLeft, CornerUpRight, Navigation, LocateFixed } from 'lucide-react';
 
 // Pure client-side haversine distance helper
 function calcDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -2039,28 +2039,30 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
         </div>
       )}
 
-      {/* Floating Re-Center Button when manual pan or zoom is active */}
-      {isManualNav && (
-        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-30 pointer-events-auto animate-fade-in">
-          <button
-            type="button"
-            onClick={recenterOnDriver}
-            className="px-5 py-2.5 rounded-full bg-slate-950/95 border-2 border-emerald-400 text-white font-black text-xs shadow-[0_8px_30px_rgba(16,185,129,0.6)] hover:bg-slate-900 transition active:scale-95 flex items-center gap-2 backdrop-blur-xl cursor-pointer"
-          >
-            <Navigation className="w-4 h-4 text-emerald-400 fill-emerald-400 animate-pulse" />
-            <span className="tracking-wide">🎯 RE-CENTER ON ME</span>
-          </button>
-        </div>
-      )}
+      {/* Google Maps Style Recenter Button on the Left Side */}
+      <div className="absolute left-4 bottom-44 sm:left-6 sm:bottom-32 z-30 pointer-events-auto">
+        <button
+          type="button"
+          onClick={recenterOnDriver}
+          className={`w-12 h-12 rounded-full shadow-2xl flex items-center justify-center border apple-pressable cursor-pointer transition-all ${
+            isManualNav
+              ? 'bg-white text-[#007AFF] border-[#007AFF] shadow-[0_4px_20px_rgba(0,122,255,0.5)] ring-4 ring-blue-500/25 animate-pulse'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.6)]'
+          }`}
+          title="Re-center on my location (Google Maps)"
+        >
+          <LocateFixed className="w-5 h-5 stroke-[2.2]" />
+        </button>
+      </div>
 
-      {/* Floating Map Actions: Pointing Pin & Fit Squad (Left Dock clear of right sidebar) */}
+      {/* Floating Map Actions: Pointing Pin & Fit Squad on the Right Side (Clear of Left Dock) */}
       {!isTripActive && (
-        <div className="absolute left-3 bottom-24 sm:left-4 sm:bottom-28 z-20 pointer-events-auto flex flex-col items-start gap-2">
+        <div className="absolute right-3.5 bottom-28 sm:right-6 sm:bottom-32 z-20 pointer-events-auto flex flex-col items-end gap-2.5">
           {/* Point Route Button */}
           <button
             type="button"
             onClick={() => setIsPointingPinMode((prev) => !prev)}
-            className={`apple-glass-pill px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition active:scale-95 border apple-pressable cursor-pointer ${
+            className={`apple-glass-pill px-3.5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition active:scale-95 border apple-pressable cursor-pointer ${
               isPointingPinMode
                 ? 'bg-[#007AFF]/25 border-[#007AFF] text-[#007AFF] shadow-[0_0_20px_rgba(0,122,255,0.4)]'
                 : 'text-slate-200 hover:text-white border-white/15'
@@ -2079,11 +2081,11 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               setIsManualNav(false);
               fitAllTravelers();
             }}
-            className="px-3 py-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-2xl shadow-2xl text-white flex items-center gap-1.5 text-xs font-bold transition active:scale-95 backdrop-blur-md cursor-pointer"
+            className="px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-full shadow-2xl text-white flex items-center gap-1.5 text-xs font-bold transition active:scale-95 backdrop-blur-md cursor-pointer"
             title="Fit all squad members on screen"
           >
             <span className="text-sm">👥</span>
-            <span>Fit Squad</span>
+            <span className="hidden sm:inline">Fit Squad</span>
           </button>
         </div>
       )}

@@ -97,7 +97,9 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
 
   // Apple Fluid Bottom Sheet (WWDC Direct Manipulation: 1:1 Pointer Tracking, 3 Detents, Momentum Projection)
   const mobileSheet = useFluidSheet({
-    peekHeight: 76,
+    peekHeight: 84,
+    halfRatio: 0.62,
+    fullRatio: 0.93,
     initialDetent: 'peek',
   });
   const isMobileDrawerOpen = mobileSheet.detent !== 'peek';
@@ -1206,7 +1208,9 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
             transition: mobileSheet.isDragging ? 'none' : 'height 380ms cubic-bezier(0.2, 0.8, 0.4, 1)',
             willChange: 'height',
           }}
-          className="md:hidden fixed bottom-0 left-0 right-0 z-30 pointer-events-auto select-none apple-glass-sheet rounded-t-[32px] flex flex-col overflow-hidden shadow-[0_-16px_48px_rgba(0,0,0,0.75)]"
+          className={`md:hidden fixed bottom-0 left-0 right-0 ${
+            isMobileDrawerOpen ? 'z-50' : 'z-30'
+          } pointer-events-auto select-none apple-glass-sheet rounded-t-[32px] flex flex-col overflow-hidden shadow-[0_-16px_48px_rgba(0,0,0,0.75)]`}
         >
           {/* Apple Specular Bevel Top Handle & Peek Header */}
           <div
@@ -1252,38 +1256,63 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Expand Drawer Button */}
+                {/* Right: Expand Drawer Button with Slide-Up Arrow */}
                 <button
                   type="button"
                   onClick={() => mobileSheet.snapTo('half')}
-                  className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center border border-white/15 apple-pressable"
-                  title="Open routes & squad"
+                  className="px-3 py-1.5 rounded-full bg-white/10 text-white flex items-center gap-1 border border-white/15 apple-pressable"
+                  title="Slide up for routes & squad"
                 >
-                  <ChevronUp className="w-4 h-4 text-blue-400" />
+                  <ChevronUp className="w-4 h-4 text-blue-400 animate-bounce" />
+                  <span className="text-[11px] font-bold text-blue-400">Menu</span>
                 </button>
               </div>
             )}
 
-            {/* Drawer Header when expanded */}
+            {/* Drawer Header with Arrow Options when Slid Up */}
             {isMobileDrawerOpen && (
               <div className="flex items-center justify-between pb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">📡</span>
                   <span className="text-[10px] text-[#34C759] font-bold bg-[#34C759]/20 px-2 py-0.5 rounded-full apple-tabular">
-                    {members.length}
+                    {members.length} Friends
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    mobileSheet.snapTo('peek');
-                  }}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400 hover:text-white apple-pressable"
-                  title="Collapse"
-                >
-                  <ChevronDown className="w-4.5 h-4.5" />
-                </button>
+
+                {/* Arrow Options for Sliding/Controlling Sheet */}
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {mobileSheet.detent === 'half' && (
+                    <button
+                      type="button"
+                      onClick={() => mobileSheet.snapTo('full')}
+                      className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-blue-400 font-bold text-[11px] flex items-center gap-1 apple-pressable border border-white/10"
+                      title="Expand to Full Screen"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Full</span>
+                    </button>
+                  )}
+                  {mobileSheet.detent === 'full' && (
+                    <button
+                      type="button"
+                      onClick={() => mobileSheet.snapTo('half')}
+                      className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-blue-400 font-bold text-[11px] flex items-center gap-1 apple-pressable border border-white/10"
+                      title="Slide to Half Height"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      <span>Half</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => mobileSheet.snapTo('peek')}
+                    className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white font-bold text-[11px] flex items-center gap-1 apple-pressable border border-white/10"
+                    title="Slide Down to Map"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    <span>Close</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
