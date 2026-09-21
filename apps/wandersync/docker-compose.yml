@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  wandersync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wandersync-app
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    volumes:
+      - ./server/data:/app/server/data

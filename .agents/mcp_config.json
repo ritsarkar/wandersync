@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "browser-mcp": {
+      "command": "D:\\Downlodess\\node.exe",
+      "args": [
+        "E:/aiscraper/apps/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "BROWSER_MCP_PORT": "19999",
+        "BROWSER_MCP_SECURITY_MODE": "MODERATE"
+      }
+    }
+  }
+}

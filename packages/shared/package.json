@@ -1,0 +1,14 @@
+{
+  "name": "@browser-mcp/shared",
+  "version": "1.0.0",
+  "description": "Common utilities, error classes, loggers, and constants for BrowserMCP",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

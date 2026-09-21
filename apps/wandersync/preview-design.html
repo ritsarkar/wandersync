@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WanderSync — Apple Find My Design System Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
+          },
+          colors: {
+            apple: {
+              blue: '#007AFF',
+              green: '#34C759',
+              orange: '#FF9500',
+              red: '#FF3B30',
+              purple: '#AF52DE',
+              teal: '#5AC8FA',
+              gray: '#8E8E93',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-light {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(25px) saturate(180%);
+      -webkit-backdrop-filter: blur(25px) saturate(180%);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+    .dark .glass-dark {
+      background: rgba(24, 24, 27, 0.84);
+      backdrop-filter: blur(25px) saturate(160%);
+      -webkit-backdrop-filter: blur(25px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    .apple-press:active {
+      transform: scale(0.96);
+      transition: transform 100ms cubic-bezier(0.2, 0.8, 0.4, 1);
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    @keyframes pulseSoft {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .pulse-ring {
+      animation: pulseSoft 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300 font-sans min-h-screen p-4 sm:p-8">
+
+  <!-- Top Navigation Bar -->
+  <header class="max-w-6xl mx-auto flex items-center justify-between py-4 mb-8 border-b border-zinc-200 dark:border-zinc-800/80">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">WanderSync</h1>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Apple Find My Design System Specification</p>
+      </div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div class="flex items-center gap-2">
+      <button id="themeToggle" class="apple-press px-4 py-2 rounded-full text-xs font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center gap-2 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">
+        <span id="themeIcon">🌙 Dark Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto space-y-12">
+
+    <!-- Hero / Design Thesis -->
+    <section class="rounded-3xl p-6 sm:p-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 mb-4">
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Design Consultation System
+      </span>
+      <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+        Glanceable Simplicity at Highway Speed
+      </h2>
+      <p class="mt-3 text-base sm:text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl leading-relaxed">
+        The map is the primary canvas. Every piece of UI lives on floating frosted-glass materials with iOS continuous squircle corners, San Francisco optical typography, and critically damped spring physics.
+      </p>
+    </section>
+
+    <!-- Interactive Component Preview: Find My Convoy Interface -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-bold tracking-tight">1. Real Product Mockup: Apple Find My HUD</h3>
+          <p class="text-sm text-zinc-500">How the live WanderSync convoy tracker looks with this design system</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">Live Interactive Preview</span>
+      </div>
+
+      <!-- Simulated Map Device -->
+      <div class="relative w-full h-[580px] rounded-[32px] overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-2xl bg-zinc-900">
+        <!-- Mock Map Background -->
+        <div class="absolute inset-0 bg-[#0f172a] bg-cover bg-center opacity-90" style="background-image: radial-gradient(#1e293b 1.5px, transparent 1.5px), radial-gradient(#1e293b 1.5px, #0b0f19 1.5px); background-size: 30px 30px; background-position: 0 0, 15px 15px;">
+          <!-- Simulated Road Path (Google Routes SVG) -->
+          <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 800 580" fill="none">
+            <!-- Alternative route (Teal) -->
+            <path d="M 120 420 Q 280 340, 420 280 T 680 160" stroke="#5AC8FA" stroke-width="5" stroke-linecap="round" opacity="0.6" stroke-dasharray="8 8" />
+            <!-- Primary route (Apple Blue) -->
+            <path d="M 120 420 C 180 380, 240 220, 360 210 C 480 200, 560 140, 680 160" stroke="#007AFF" stroke-width="7" stroke-linecap="round" filter="drop-shadow(0 0 8px rgba(0,122,255,0.5))" />
+          </svg>
+
+          <!-- Marker 1: Current User (Blue Halo) -->
+          <div class="absolute left-[120px] top-[420px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div class="relative flex items-center justify-center">
+              <div class="absolute w-14 h-14 rounded-full border-2 border-blue-500 pulse-ring"></div>
+              <div class="w-11 h-11 rounded-full bg-zinc-900/90 border-2 border-blue-500 shadow-lg flex items-center justify-center text-lg backdrop-blur-md">
+                🏎️
+              </div>
+            </div>
+            <div class="mt-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/90 border border-white/10 text-[11px] font-semibold text-white shadow backdrop-blur-md">
+              You • <span class="font-mono text-blue-400">72 km/h</span>
+            </div>
+          </div>
+
+          <!-- Marker 2: Friend Rahul (Green Halo) -->
+          <div class="absolute left-[360px] top-[210px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div class="w-10 h-10 rounded-full bg-zinc-900/90 border-2 border-emerald-500 shadow-lg flex items-center justify-center text-base backdrop-blur-md">
+              🏍️
+            </div>
+            <div class="mt-1.5 px-2 py-0.5 rounded-full bg-zinc-900/90 border border-white/10 text-[11px] font-semibold text-white shadow backdrop-blur-md">
+              Rahul • <span class="font-mono text-emerald-400">64 km/h</span>
+            </div>
+          </div>
+
+          <!-- Marker 3: Destination Pin (Orange) -->
+          <div class="absolute left-[680px] top-[160px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center animate-bounce">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-red-500 border-2 border-amber-300 shadow-xl flex items-center justify-center text-xl text-white">
+              📍
+            </div>
+            <div class="mt-1.5 px-3 py-1 rounded-full bg-zinc-900/95 border border-amber-500/40 text-xs font-bold text-amber-300 shadow-lg backdrop-blur-md">
+              Meeting Spot
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Floating Telemetry Pill (Apple Find My HUD) -->
+        <div class="absolute top-5 left-5 right-5 flex items-center justify-between pointer-events-none">
+          <div class="pointer-events-auto px-4 py-2 rounded-full bg-white/80 dark:bg-zinc-900/80 border border-black/5 dark:border-white/10 backdrop-blur-xl shadow-lg flex items-center gap-3 text-xs font-semibold">
+            <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              GPS Live Lock
+            </span>
+            <span class="text-zinc-400">|</span>
+            <span class="text-zinc-600 dark:text-zinc-300">Room: <span class="font-mono font-bold">ALPHA-7</span></span>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="pointer-events-auto flex items-center gap-2">
+            <button class="apple-press w-10 h-10 rounded-full bg-white/80 dark:bg-zinc-900/80 border border-black/5 dark:border-white/10 backdrop-blur-xl shadow-lg flex items-center justify-center text-zinc-700 dark:text-zinc-200">
+              📍
+            </button>
+            <button class="apple-press px-4 py-2 rounded-full bg-blue-600 text-white font-semibold text-xs shadow-lg shadow-blue-600/30 flex items-center gap-1.5">
+              👥 Fit Squad
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom Sheet (Apple Find My Floating Card) -->
+        <div class="absolute bottom-4 left-4 right-4 max-w-md mx-auto rounded-[28px] bg-white/85 dark:bg-zinc-900/85 border border-black/5 dark:border-white/10 backdrop-blur-2xl shadow-2xl p-5">
+          <!-- Pill Handle -->
+          <div class="w-9 h-1 rounded-full bg-zinc-400/40 mx-auto mb-3"></div>
+
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h4 class="text-base font-bold tracking-tight">Weekend Convoy (3 Active)</h4>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Destination: Nandi Hills Lookout</p>
+            </div>
+            <div class="text-right">
+              <span class="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">38 mins</span>
+              <p class="text-[10px] text-zinc-400">28.4 km remaining</p>
+            </div>
+          </div>
+
+          <!-- Traveler Roster Pills -->
+          <div class="space-y-2">
+            <!-- Member 1 -->
+            <div class="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-100/70 dark:bg-zinc-800/60 border border-zinc-200/50 dark:border-white/5">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-sm">🏎️</span>
+                <div>
+                  <div class="text-xs font-bold flex items-center gap-1.5">
+                    You (Leader)
+                    <span class="px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 text-[9px] font-bold">Fastest</span>
+                  </div>
+                  <div class="text-[11px] text-zinc-500 dark:text-zinc-400">via NH 44 • 72 km/h</div>
+                </div>
+              </div>
+              <span class="font-mono text-xs font-semibold text-emerald-500">Live</span>
+            </div>
+
+            <!-- Member 2 -->
+            <div class="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-100/70 dark:bg-zinc-800/60 border border-zinc-200/50 dark:border-white/5">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-sm">🏍️</span>
+                <div>
+                  <div class="text-xs font-bold">Rahul Verma</div>
+                  <div class="text-[11px] text-zinc-500 dark:text-zinc-400">1.4 km behind • 64 km/h</div>
+                </div>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium">Find</span>
+            </div>
+          </div>
+
+          <!-- Action Grid -->
+          <div class="mt-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between gap-2">
+            <button class="apple-press flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-center gap-1">
+              ⚠️ Add Stop
+            </button>
+            <button class="apple-press flex-1 py-2 rounded-xl bg-blue-600 text-xs font-semibold text-white flex items-center justify-center gap-1 shadow-md shadow-blue-600/20">
+              🧭 Change Destination
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Color System Swatches -->
+    <section class="space-y-4">
+      <h3 class="text-xl font-bold tracking-tight">2. Semantic Apple Palette & Tokens</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        <!-- Blue -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#007AFF]"></div>
+          <div class="text-xs font-bold">System Blue</div>
+          <div class="font-mono text-[11px] text-zinc-500">#007AFF</div>
+          <div class="text-[10px] text-zinc-400">Active Route, Leader, Primary CTA</div>
+        </div>
+        <!-- Green -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#34C759]"></div>
+          <div class="text-xs font-bold">System Green</div>
+          <div class="font-mono text-[11px] text-zinc-500">#34C759</div>
+          <div class="text-[10px] text-zinc-400">Moving (>5 km/h), GPS Satellite Lock</div>
+        </div>
+        <!-- Orange -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#FF9500]"></div>
+          <div class="text-xs font-bold">System Orange</div>
+          <div class="font-mono text-[11px] text-zinc-500">#FF9500</div>
+          <div class="text-[10px] text-zinc-400">Meeting Point Pin, Rest Stop</div>
+        </div>
+        <!-- Red -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#FF3B30]"></div>
+          <div class="text-xs font-bold">System Red</div>
+          <div class="font-mono text-[11px] text-zinc-500">#FF3B30</div>
+          <div class="text-[10px] text-zinc-400">Emergency SOS, Sharp Curve Warning</div>
+        </div>
+        <!-- Purple -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#AF52DE]"></div>
+          <div class="text-xs font-bold">System Purple</div>
+          <div class="font-mono text-[11px] text-zinc-500">#AF52DE</div>
+          <div class="text-[10px] text-zinc-400">Scenic Viewpoint, Gas / Fuel</div>
+        </div>
+        <!-- Teal -->
+        <div class="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+          <div class="h-12 rounded-xl bg-[#5AC8FA]"></div>
+          <div class="text-xs font-bold">System Teal</div>
+          <div class="font-mono text-[11px] text-zinc-500">#5AC8FA</div>
+          <div class="text-[10px] text-zinc-400">Alternative Road Route 2</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Typography & Tabular Telemetrics -->
+    <section class="space-y-4">
+      <h3 class="text-xl font-bold tracking-tight">3. Typography Hierarchy & Jitter-Free Telemetry</h3>
+      <div class="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6">
+        <div>
+          <div class="text-xs text-zinc-400 uppercase font-bold tracking-wider mb-1">Display & Headings (Negative Tracking)</div>
+          <div class="text-2xl font-bold tracking-tight">Bengaluru to Nandi Hills Expressway</div>
+        </div>
+        <div>
+          <div class="text-xs text-zinc-400 uppercase font-bold tracking-wider mb-1">Body Text (Neutral Tracking)</div>
+          <div class="text-sm text-zinc-600 dark:text-zinc-300">Rahul is traveling via NH 44 and estimated to arrive 12 minutes before the group.</div>
+        </div>
+        <div>
+          <div class="text-xs text-zinc-400 uppercase font-bold tracking-wider mb-1">Telemetry & Speeds (Strict Tabular Monospace)</div>
+          <div class="flex items-center gap-6 font-mono text-sm">
+            <span class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 tabular-nums font-bold">⚡ 74.8 km/h</span>
+            <span class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 tabular-nums font-bold">📍 13.2039° N, 77.7058° E</span>
+            <span class="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 tabular-nums font-bold">⏳ ETA: 18:45 IST</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const toggle = document.getElementById('themeToggle');
+    const icon = document.getElementById('themeIcon');
+    let isDark = true;
+    document.documentElement.classList.add('dark');
+
+    toggle.addEventListener('click', () => {
+      isDark = !isDark;
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        icon.textContent = '🌙 Dark Mode';
+      } else {
+        document.documentElement.classList.remove('dark');
+        icon.textContent = '☀️ Light Mode';
+      }
+    });
+  </script>
+</body>
+</html>

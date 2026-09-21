@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrowserMCP — AI-Controlled Browser Infrastructure</title>
+  <meta name="description" content="Universal AI browser control layer connecting ChatGPT, Claude, and MCP clients to Google Chrome." />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container nav-container">
+      <div class="nav-logo">
+        <span>⚡ BrowserMCP</span>
+        <span class="badge">Local-First</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#simulator">Playground</a></li>
+        <li><a href="#tools">Tools (14)</a></li>
+        <li><a href="#setup">Setup</a></li>
+        <li><a href="https://github.com" target="_blank" class="nav-btn">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-pill">
+        <span>Model Context Protocol (MCP) Standard</span>
+        <span>•</span>
+        <span>Google Chrome Manifest V3</span>
+      </div>
+      <h1>Give Your AI Real Browser Superpowers. Safely.</h1>
+      <p>
+        BrowserMCP connects AI clients (ChatGPT, Claude Desktop, Cursor) directly to your real Google Chrome browser. 
+        Read pages, extract semantic DOM trees, click, type, and automate multi-step workflows with local-first security.
+      </p>
+      <div class="hero-actions">
+        <a href="#setup" class="btn-primary">Get Started</a>
+        <a href="#simulator" class="btn-secondary">Explore Interactive Demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Flow -->
+  <section id="architecture" class="container">
+    <div class="arch-diagram">
+      <div class="section-header" style="margin-bottom: 24px;">
+        <h2>How BrowserMCP Works</h2>
+        <p>The AI is the brain. BrowserMCP is the hands and browser interface.</p>
+      </div>
+      <div class="arch-boxes">
+        <div class="arch-box">
+          <div class="arch-title">AI Client</div>
+          <div class="arch-sub">Claude / ChatGPT</div>
+        </div>
+        <div class="arch-arrow">➔</div>
+        <div class="arch-box highlight">
+          <div class="arch-title">MCP Server</div>
+          <div class="arch-sub">Tools & Permissions</div>
+        </div>
+        <div class="arch-arrow">➔</div>
+        <div class="arch-box highlight">
+          <div class="arch-title">Chrome Extension</div>
+          <div class="arch-sub">DOM Reader & Actions</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Simulator Section -->
+  <section id="simulator" class="playground-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Interactive Protocol Simulator</h2>
+        <p>Select an AI action below to see how Model Context Protocol JSON-RPC requests translate into real browser DOM actions.</p>
+      </div>
+
+      <div class="simulator-grid">
+        <div class="sim-controls">
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Simulate AI Tool Call:</div>
+          <div class="sim-btn-group">
+            <button class="sim-action-btn active" data-sim="navigate">browser_navigate</button>
+            <button class="sim-action-btn" data-sim="get_dom">browser_get_dom</button>
+            <button class="sim-action-btn" data-sim="click">browser_click (@e3)</button>
+            <button class="sim-action-btn" data-sim="type">browser_type (search)</button>
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 12px;">
+            MCP Request Payload:
+          </div>
+          <pre id="sim-request-code" class="code-view"></pre>
+        </div>
+
+        <div>
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Browser Bridge & Content Response:</div>
+          <pre id="sim-response-code" class="code-view" style="max-height: 480px;"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools Grid -->
+  <section id="tools" class="tools-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>14 Production MCP Browser Tools</h2>
+        <p>Comprehensive browser automation primitives designed for LLM token efficiency.</p>
+      </div>
+
+      <div class="tools-grid">
+        <div class="tool-card">
+          <div class="tool-name">browser_navigate</div>
+          <div class="tool-desc">Navigates to URL, history back/forward, or reloads active/new tabs.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_get_dom</div>
+          <div class="tool-desc">Token-optimized accessibility snapshot with interactive refs (@e1, @e2).</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_get_text</div>
+          <div class="tool-desc">Extracts clean Markdown / plain text from active webpage or specific selector.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_click</div>
+          <div class="tool-desc">Simulates realistic pointer and click events on elements by ref (@e1) or selector.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_type</div>
+          <div class="tool-desc">Keyboard typing simulation into inputs/textareas with optional Enter key submission.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_press_key</div>
+          <div class="tool-desc">Triggers keyboard interactions (Tab, Enter, Escape, Arrow keys).</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_scroll</div>
+          <div class="tool-desc">Smoothly scrolls viewports or elements up, down, top, bottom, or into view.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_screenshot</div>
+          <div class="tool-desc">Captures high-resolution visual viewport snapshots for vision-capable models.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_list_tabs</div>
+          <div class="tool-desc">Lists open Chrome tabs with IDs, titles, URLs, and active states.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_switch_tab</div>
+          <div class="tool-desc">Activates and focuses a specific Chrome tab by tab ID.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_new_tab</div>
+          <div class="tool-desc">Opens a new browser tab with an optional target URL.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_close_tab</div>
+          <div class="tool-desc">Closes open tabs by tab ID.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_wait_for</div>
+          <div class="tool-desc">Polls until a CSS selector is rendered and visible in DOM.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">browser_evaluate</div>
+          <div class="tool-desc">Evaluates custom JavaScript expression in page context (security gated).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Setup Section -->
+  <section id="setup" class="playground-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Quickstart in 2 Minutes</h2>
+        <p>Connect Claude Desktop or Cursor to your local Chrome instance.</p>
+      </div>
+
+      <div style="max-width: 800px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 13px; color: var(--primary);">claude_desktop_config.json</span>
+          <button id="btn-copy-config" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;">Copy Configuration</button>
+        </div>
+        <pre id="claude-config-code" class="code-view">{
+  "mcpServers": {
+    "browser-mcp": {
+      "command": "node",
+      "args": [
+        "E:/aiscraper/apps/mcp-server/dist/index.js"
+      ]
+    }
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <div class="container">
+      <p>BrowserMCP • Open Source AI Browser Control Infrastructure • MIT License</p>
+    </div>
+  </footer>
+
+  <script src="src/main.js"></script>
+</body>
+</html>

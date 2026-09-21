@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrowserMCP Status</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <span class="brand-title">BrowserMCP</span>
+          <span class="brand-subtitle">AI Browser Bridge</span>
+        </div>
+      </div>
+      <div id="connection-badge" class="badge badge-disconnected">
+        <span class="badge-dot"></span>
+        <span id="connection-status-text">Disconnected</span>
+      </div>
+    </header>
+
+    <!-- Active Tab Info -->
+    <section class="card tab-card">
+      <div class="card-label">Active Chrome Tab</div>
+      <div id="tab-title" class="tab-title">Loading tab...</div>
+      <div id="tab-url" class="tab-url">...</div>
+    </section>
+
+    <!-- Security Mode Selector -->
+    <section class="card security-card">
+      <div class="card-label">Security Policy Mode</div>
+      <div class="mode-buttons">
+        <button id="mode-strict" class="mode-btn" data-mode="STRICT">
+          <span class="mode-name">Strict</span>
+          <span class="mode-desc">Approve all</span>
+        </button>
+        <button id="mode-moderate" class="mode-btn active" data-mode="MODERATE">
+          <span class="mode-name">Moderate</span>
+          <span class="mode-desc">Balanced</span>
+        </button>
+        <button id="mode-unrestricted" class="mode-btn" data-mode="UNRESTRICTED">
+          <span class="mode-name">Full</span>
+          <span class="mode-desc">Fast dev</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="actions-grid">
+      <button id="btn-highlight" class="btn btn-secondary">
+        <span>👁️ Highlight Refs</span>
+      </button>
+      <button id="btn-reconnect" class="btn btn-secondary">
+        <span>🔄 Reconnect</span>
+      </button>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <button id="btn-open-options" class="link-btn">Configure Settings & Token</button>
+      <div class="version">v1.0.0</div>
+    </footer>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

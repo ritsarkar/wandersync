@@ -1,0 +1,23 @@
+{
+  "name": "@browser-mcp/chrome-extension",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "BrowserMCP Chrome Extension (Manifest V3) for AI-controlled browser actions",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@browser-mcp/protocol": "*",
+    "@browser-mcp/shared": "*",
+    "@browser-mcp/permissions": "*",
+    "@browser-mcp/browser-core": "*",
+    "@browser-mcp/security": "*"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  }
+}

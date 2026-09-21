@@ -1,0 +1,35 @@
+{
+  "name": "browser-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Universal AI Browser Control Platform via Model Context Protocol (MCP) and Chrome Extension",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser-automation",
+    "chrome-extension",
+    "ai-agent",
+    "browser-control"
+  ],
+  "author": "BrowserMCP Team",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "tsx --test tests/**/*.test.ts",
+    "lint": "npm run lint --workspaces --if-present",
+    "start:server": "npm run start --workspace=apps/mcp-server",
+    "build:extension": "npm run build --workspace=apps/chrome-extension",
+    "dev:website": "npm run dev --workspace=apps/website",
+    "dev:wandersync": "npm run dev --workspace=apps/wandersync",
+    "start:wandersync": "npm run dev:server --workspace=apps/wandersync"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.2"
+  }
+}
