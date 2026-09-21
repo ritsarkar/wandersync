@@ -15,6 +15,7 @@ import {
   QrCode,
   ArrowRight,
   Navigation,
+  Search,
 } from 'lucide-react';
 import { TransportMode } from '../types';
 import { GooglePlaceSearchInput } from './GooglePlaceSearchInput';
@@ -59,11 +60,10 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
 
   const isJoiningViaLink = Boolean(urlParam);
 
-  const [activeTab, setActiveTab] = useState<'create' | 'join'>(isJoiningViaLink ? 'join' : 'create');
+  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   // Fields for Creation
   const [createTripCode] = useState(() => {
-    if (urlParam) return urlParam.toUpperCase();
     return `TRIP-${Math.floor(100 + Math.random() * 900)}`;
   });
   const [creatorName, setCreatorName] = useState(() => localStorage.getItem('wandersync_user_name') || '');
@@ -72,7 +72,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
     icon: string;
     lat: number;
     lng: number;
-  } | null>(POPULAR_DESTINATIONS[0]);
+  } | null>(null);
 
   // Fields for Joining
   const [joinTripCode, setJoinTripCode] = useState(urlParam || '');
@@ -238,25 +238,11 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
         <div className="fixed top-3 left-3 right-3 sm:top-5 sm:left-5 sm:right-auto sm:w-[420px] z-40 max-h-[92vh] flex flex-col pointer-events-auto animate-fade-in">
           <div className="apple-glass-card rounded-[28px] p-5 shadow-2xl text-slate-100 flex flex-col gap-4 overflow-y-auto max-h-[90vh]">
             
-            {/* Header: Brand & Minimize Button */}
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-sm font-bold">
-                    🧭
-                  </div>
-                  <h1 className="text-xl font-bold text-white tracking-tight apple-large-title">
-                    WanderSync
-                  </h1>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#34C759]/15 border border-[#34C759]/30 text-[#34C759] text-[10px] font-bold apple-caption">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse" />
-                    Live Convoy
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1 leading-snug">
-                  Real-time GPS tracking & authentic Google road routes on minimal mountain maps.
-                </p>
-              </div>
+            {/* Header: Minimal Name & Minimize Button */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 tracking-wider lowercase">
+                wandersync
+              </span>
 
               {/* Minimize Card button to inspect map */}
               <button
@@ -266,75 +252,6 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
               >
                 <Eye className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* QUICK GROUP INVITE BAR (Click to share link directly) */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
-                  <Share2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Group Invite Link</span>
-                </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-200 font-bold">
-                  {currentActiveCode}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  readOnly
-                  value={shareUrl}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  className="w-full bg-slate-950/80 border border-slate-700 text-slate-300 text-[11px] font-mono rounded-xl px-2.5 py-2 truncate focus:outline-none focus:border-emerald-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition shrink-0 flex items-center gap-1"
-                  title="Copy direct invite link"
-                >
-                  {copiedLink ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-200" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Direct 1-Click Share Actions */}
-              <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-                <button
-                  type="button"
-                  onClick={handleWhatsAppShare}
-                  className="py-1.5 px-2 bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/40 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1 active:scale-95"
-                >
-                  <MessageCircle className="w-3 h-3 text-emerald-400" />
-                  <span>WhatsApp</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNativeShare}
-                  className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1 active:scale-95"
-                >
-                  <Share2 className="w-3 h-3" />
-                  <span>Share App</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowShareModal(true)}
-                  className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1 active:scale-95"
-                >
-                  <QrCode className="w-3 h-3" />
-                  <span>QR Code</span>
-                </button>
-              </div>
             </div>
 
             {/* Tab Switcher: Create vs Join */}
@@ -347,7 +264,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Create Trip</span>
+                <span>Create</span>
               </button>
               <button
                 type="button"
@@ -357,7 +274,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                 }`}
               >
                 <Users className="w-3.5 h-3.5 text-blue-400" />
-                <span>Join Friend</span>
+                <span>Join</span>
               </button>
             </div>
 
@@ -366,15 +283,80 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
             {/* =================================================================== */}
             {activeTab === 'create' && (
               <form onSubmit={handleCreateSubmit} className="space-y-3">
+                {/* Search Location / Destination (Prominently right below Create) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Search Location</span>
+                    </span>
+                    {selectedDestination && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDestination(null)}
+                        className="text-[10px] text-slate-400 hover:text-rose-400"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </label>
+
+                  <GooglePlaceSearchInput
+                    placeholder="Search location (e.g. Manali, Goa)..."
+                    initialValue={selectedDestination ? selectedDestination.name : ''}
+                    onSelectPlace={(place) => {
+                      setSelectedDestination({
+                        name: place.name,
+                        icon: '📍',
+                        lat: place.lat,
+                        lng: place.lng,
+                      });
+                    }}
+                  />
+
+                  {/* Selected Location Banner */}
+                  {selectedDestination && (
+                    <div className="flex items-center justify-between p-2 mt-1.5 rounded-xl bg-slate-800/80 border border-emerald-500/40 text-xs">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-sm">{selectedDestination.icon}</span>
+                        <span className="font-semibold text-slate-100 truncate">
+                          {selectedDestination.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 shrink-0">
+                        Selected
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Quick Popular Location Chips */}
+                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-0.5">
+                    {POPULAR_DESTINATIONS.slice(0, 6).map((dest) => (
+                      <button
+                        key={dest.name}
+                        type="button"
+                        onClick={() => setSelectedDestination(dest)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0 border transition apple-pressable ${
+                          selectedDestination?.name === dest.name
+                            ? 'bg-emerald-600/30 border-emerald-400 text-emerald-300 font-bold'
+                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                        }`}
+                      >
+                        {dest.icon} {dest.name.split(',')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Name */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Your Name / Call-sign
+                    Your Name
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Rits, Alex, Captain"
+                    placeholder="Enter your name"
                     value={creatorName}
                     onChange={(e) => setCreatorName(e.target.value)}
                     className="w-full bg-slate-800/80 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
@@ -392,7 +374,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                         key={v.mode}
                         type="button"
                         onClick={() => setSelectedMode(v.mode)}
-                        className={`p-2 rounded-xl flex flex-col items-center gap-1 border transition ${
+                        className={`p-2 rounded-xl flex flex-col items-center gap-1 border transition apple-pressable ${
                           selectedMode === v.mode
                             ? 'bg-emerald-600/30 border-emerald-400 text-emerald-300'
                             : 'bg-slate-800/60 border-slate-700/80 text-slate-400 hover:bg-slate-800'
@@ -405,80 +387,12 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                   </div>
                 </div>
 
-                {/* Optional Destination */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-300">
-                      Destination / Meeting Spot
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowDestinationPicker(!showDestinationPicker)}
-                      className="text-[10px] text-emerald-400 hover:underline"
-                    >
-                      {showDestinationPicker ? 'Hide Options' : 'Change Spot'}
-                    </button>
-                  </div>
-
-                  {/* Selected destination pill */}
-                  {selectedDestination && !showDestinationPicker && (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 text-xs">
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="text-base">{selectedDestination.icon}</span>
-                        <span className="font-semibold text-slate-200 truncate">
-                          {selectedDestination.name}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-bold shrink-0">Selected</span>
-                    </div>
-                  )}
-
-                  {/* Destination picker list */}
-                  {showDestinationPicker && (
-                    <div className="space-y-2 mt-1 p-2 bg-slate-950/60 rounded-2xl border border-slate-800">
-                      <GooglePlaceSearchInput
-                        placeholder="Search Google Places (e.g. Gangarampur)..."
-                        onSelectPlace={(place) => {
-                          setSelectedDestination({
-                            name: place.name,
-                            icon: '📍',
-                            lat: place.lat,
-                            lng: place.lng,
-                          });
-                          setShowDestinationPicker(false);
-                        }}
-                      />
-
-                      <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto pr-1">
-                        {POPULAR_DESTINATIONS.map((dest) => (
-                          <button
-                            key={dest.name}
-                            type="button"
-                            onClick={() => {
-                              setSelectedDestination(dest);
-                              setShowDestinationPicker(false);
-                            }}
-                            className={`p-2 rounded-xl text-left flex items-center gap-1.5 border transition ${
-                              selectedDestination?.name === dest.name
-                                ? 'bg-emerald-600/30 border-emerald-400 text-emerald-300'
-                                : 'bg-slate-800/50 border-slate-700/60 text-slate-300 hover:bg-slate-800'
-                            }`}
-                          >
-                            <span className="text-sm">{dest.icon}</span>
-                            <span className="text-[11px] truncate font-medium">{dest.name.split(',')[0]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Primary Button */}
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer mt-1"
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer mt-1 apple-pressable"
                 >
-                  <span>Start Squad & Open Convoy Map</span>
+                  <span>Start Trip</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
@@ -572,18 +486,18 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                 {/* Primary Join Button */}
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-black text-xs shadow-xl shadow-blue-600/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer mt-1"
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-blue-600/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer mt-1 apple-pressable"
                 >
-                  <span>Join Squad & View Live Map</span>
+                  <span>Join Trip</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             )}
 
             {/* Privacy footer badge */}
-            <div className="pt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Zero tracking outside your squad. Completely private.</span>
+            <div className="pt-0.5 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+              <Shield className="w-3 h-3 text-emerald-400/80" />
+              <span>Private & peer-to-peer</span>
             </div>
           </div>
         </div>

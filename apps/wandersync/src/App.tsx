@@ -746,7 +746,16 @@ export const App: React.FC = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Minimal Homepage with Ambient Map & Group Invite */}
-      {!isJoined && <HomepageHero onJoin={handleJoin} initialTripCode={groupId} />}
+      {!isJoined && (
+        <HomepageHero
+          onJoin={handleJoin}
+          initialTripCode={
+            new URLSearchParams(window.location.search).get('trip') ||
+            new URLSearchParams(window.location.search).get('group') ||
+            undefined
+          }
+        />
+      )}
 
       {/* Main Mountain & Road Map: Google Maps with Directions or Topo Fallback */}
       {useGoogleMaps && GOOGLE_MAPS_KEY ? (
