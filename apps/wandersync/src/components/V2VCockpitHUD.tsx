@@ -273,20 +273,20 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
               <span className="hidden sm:inline">Police</span>
             </button>
 
-            {/* 📍 Point & Mark Aiming Reticle Button */}
+            {/* 🎯 Point Route Aiming Reticle Button */}
             {onTogglePointingPin && (
               <button
                 type="button"
                 onClick={onTogglePointingPin}
                 className={`px-2 sm:px-2.5 py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1 apple-pressable cursor-pointer shrink-0 ${
                   isPointingPinMode
-                    ? 'bg-[#FF9500] text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.6)]'
-                    : 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/50 text-amber-200'
+                    ? 'bg-[#007AFF] text-white border-blue-400 shadow-[0_0_15px_rgba(0,122,255,0.6)]'
+                    : 'bg-white/10 hover:bg-white/15 border-white/15 text-slate-200'
                 }`}
-                title="Aim and mark any spot on the road with crosshair reticle"
+                title="Point on map to create or check route through spot"
               >
-                <span className="text-base sm:text-sm">📍</span>
-                <span className="hidden sm:inline">{isPointingPinMode ? 'Aiming...' : 'Point & Mark'}</span>
+                <span className="text-base sm:text-sm">🎯</span>
+                <span className="hidden sm:inline">{isPointingPinMode ? 'Aiming...' : 'Point Route'}</span>
               </button>
             )}
           </div>

@@ -347,6 +347,258 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const [selectedPinCategory, setSelectedPinCategory] = useState<string>('speed-breaker');
   const [pinnedConfirmationToast, setPinnedConfirmationToast] = useState<string | null>(null);
 
+  // Keep track of active calculated routes (Declared early for point-route logic)
+  const [activeDisplayRoutes, setActiveDisplayRoutes] = useState<TravelRoute[]>(routes);
+
+  // Sync / merge active display routes when remote group routes change
+  useEffect(() => {
+    if (routes && routes.length > 0) {
+      setActiveDisplayRoutes((prev) => {
+        if (!prev || prev.length === 0) return routes;
+        const myLocalRoutes = prev.filter((r) => !r.forUserId || r.forUserId === currentUserId);
+        const remoteRoutes = routes.filter((r) => r.forUserId && r.forUserId !== currentUserId);
+        return [...myLocalRoutes, ...remoteRoutes];
+      });
+    }
+  }, [routes, currentUserId]);
+
+  // =========================================================================
+  // CREATIVE & MINIMAL POINT-ON-MAP ROUTE ENGINE
+  // =========================================================================
+  interface PointedLocation {
+    lat: number;
+    lng: number;
+    isOnRoute: boolean;
+    roadName?: string;
+    distanceKm?: number;
+    durationMins?: number;
+  }
+
+  const [pointedPoint, setPointedPoint] = useState<PointedLocation | null>(null);
+  const [isCalculatingPointRoute, setIsCalculatingPointRoute] = useState(false);
+  const originalDirectRoutesRef = useRef<TravelRoute[]>([]);
+  const pointedOverlayRef = useRef<any>(null);
+
+  // Distance in meters from a point P to a line segment AB
+  const getDistanceToSegmentMeters = (
+    pLat: number,
+    pLng: number,
+    aLat: number,
+    aLng: number,
+    bLat: number,
+    bLng: number
+  ): number => {
+    const R = 6371000;
+    const toRad = Math.PI / 180;
+    const latMid = ((aLat + bLat) / 2) * toRad;
+
+    const xA = aLng * toRad * Math.cos(latMid) * R;
+    const yA = aLat * toRad * R;
+    const xB = bLng * toRad * Math.cos(latMid) * R;
+    const yB = bLat * toRad * R;
+    const xP = pLng * toRad * Math.cos(latMid) * R;
+    const yP = pLat * toRad * R;
+
+    const dx = xB - xA;
+    const dy = yB - yA;
+    const lenSq = dx * dx + dy * dy;
+
+    if (lenSq === 0) {
+      return Math.hypot(xP - xA, yP - yA);
+    }
+
+    const t = Math.max(0, Math.min(1, ((xP - xA) * dx + (yP - yA) * dy) / lenSq));
+    const projX = xA + t * dx;
+    const projY = yA + t * dy;
+
+    return Math.hypot(xP - projX, yP - projY);
+  };
+
+  // Check if a clicked/aimed point lies along the current active route
+  const checkIfPointIsOnRoute = useCallback(
+    (pLat: number, pLng: number, toleranceMeters = 160): boolean => {
+      // 1. Google Maps Geometry isLocationOnEdge check
+      if (window.google?.maps?.geometry?.poly) {
+        for (const p of polylinesRef.current) {
+          try {
+            const isOn = google.maps.geometry.poly.isLocationOnEdge(
+              new google.maps.LatLng(pLat, pLng),
+              p,
+              0.0016
+            );
+            if (isOn) return true;
+          } catch (e) {}
+        }
+      }
+
+      // 2. High-precision coordinate segment math fallback
+      const myRoutes = activeDisplayRoutes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
+      for (const route of myRoutes) {
+        if (!route.coordinates || route.coordinates.length < 2) continue;
+        for (let i = 0; i < route.coordinates.length - 1; i++) {
+          const [lat1, lng1] = route.coordinates[i];
+          const [lat2, lng2] = route.coordinates[i + 1];
+          const dist = getDistanceToSegmentMeters(pLat, pLng, lat1, lng1, lat2, lng2);
+          if (dist <= toleranceMeters) return true;
+        }
+      }
+      return false;
+    },
+    [activeDisplayRoutes, currentUserId]
+  );
+
+  // Clear pointed route detour and restore original direct route
+  const handleClearPointedRoute = useCallback(() => {
+    setPointedPoint(null);
+    if (originalDirectRoutesRef.current.length > 0) {
+      setActiveDisplayRoutes(originalDirectRoutesRef.current);
+      if (onRoutesCalculated) {
+        const myRoutes = originalDirectRoutesRef.current.filter((r) => !r.forUserId || r.forUserId === currentUserId);
+        onRoutesCalculated(myRoutes);
+      }
+    }
+    setPinnedConfirmationToast('Reverted to direct route');
+    setTimeout(() => setPinnedConfirmationToast(null), 2500);
+  }, [onRoutesCalculated, currentUserId]);
+
+  // Main Point Location Handler
+  const handlePointLocation = useCallback(
+    async (lat: number, lng: number) => {
+      // 1. If pointing on our route: keep route unchanged!
+      const isOnRoute = checkIfPointIsOnRoute(lat, lng);
+
+      playPinChime();
+      if (navigator.vibrate) {
+        navigator.vibrate(25);
+      }
+
+      if (isOnRoute) {
+        setPointedPoint({
+          lat,
+          lng,
+          isOnRoute: true,
+        });
+        setPinnedConfirmationToast('✨ Point is on current route');
+        setTimeout(() => setPinnedConfirmationToast(null), 2800);
+        return;
+      }
+
+      // 2. If pointing to another location: calculate route through there with all alternatives!
+      setIsCalculatingPointRoute(true);
+      setPointedPoint({
+        lat,
+        lng,
+        isOnRoute: false,
+      });
+      setPinnedConfirmationToast('Calculating route via point...');
+
+      // Cache original direct routes before overriding
+      if (originalDirectRoutesRef.current.length === 0 && activeDisplayRoutes.length > 0) {
+        originalDirectRoutesRef.current = activeDisplayRoutes;
+      }
+
+      const myMember = members.find((m) => m.id === currentUserId);
+      const mapCenter = mapInstanceRef.current?.getCenter();
+      const userOrigin = myMember?.location
+        ? { lat: myMember.location.lat, lng: myMember.location.lng }
+        : mapCenter
+        ? { lat: mapCenter.lat(), lng: mapCenter.lng() }
+        : { lat: 28.6139, lng: 77.2090 };
+
+      const destination = rendezvous
+        ? { lat: rendezvous.lat, lng: rendezvous.lng }
+        : { lat, lng };
+
+      const hasDistinctDestination = Boolean(
+        rendezvous && (Math.abs(rendezvous.lat - lat) > 0.0008 || Math.abs(rendezvous.lng - lng) > 0.0008)
+      );
+
+      try {
+        if (window.google?.maps?.DirectionsService) {
+          const directionsService = new window.google.maps.DirectionsService();
+          const request: google.maps.DirectionsRequest = {
+            origin: { lat: userOrigin.lat, lng: userOrigin.lng },
+            destination,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            provideRouteAlternatives: true,
+            ...(hasDistinctDestination
+              ? {
+                  waypoints: [
+                    {
+                      location: new window.google.maps.LatLng(lat, lng),
+                      stopover: true,
+                    },
+                  ],
+                }
+              : {}),
+          };
+
+          const result = await directionsService.route(request);
+          if (result.routes && result.routes.length > 0) {
+            const viaRoutes: TravelRoute[] = result.routes.map((r, idx) => {
+              const path = r.overview_path || [];
+              const coordinates: [number, number][] = path.map((p) => [p.lat(), p.lng()]);
+              let totalDistMeters = 0;
+              let totalDurationSecs = 0;
+              r.legs?.forEach((leg) => {
+                totalDistMeters += leg.distance?.value || 0;
+                totalDurationSecs += leg.duration?.value || 0;
+              });
+              const distanceKm = +(totalDistMeters / 1000).toFixed(1);
+              const durationMins = Math.round(totalDurationSecs / 60);
+              const summary = r.summary ? `via ${r.summary}` : `Route via Point ${idx + 1}`;
+
+              return {
+                id: `via-route-${currentUserId}-${idx + 1}`,
+                name: summary,
+                distanceKm,
+                durationMins,
+                coordinates,
+                color: idx === 0 ? DRIVER_PRIMARY_COLOR : '#60a5fa',
+                tag: idx === 0 ? 'Fastest via Point' : `Alternative ${idx + 1}`,
+                forUserId: currentUserId,
+                forUserName: myMember?.name || 'You',
+              };
+            });
+
+            // Display via routes with all alternatives
+            setActiveDisplayRoutes((prev) => {
+              const others = prev.filter((r) => r.forUserId && r.forUserId !== currentUserId);
+              return [...viaRoutes, ...others];
+            });
+
+            if (onRoutesCalculated) {
+              onRoutesCalculated(viaRoutes);
+            }
+
+            setPointedPoint((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    roadName: viaRoutes[0].name,
+                    distanceKm: viaRoutes[0].distanceKm,
+                    durationMins: viaRoutes[0].durationMins,
+                  }
+                : null
+            );
+
+            setPinnedConfirmationToast(
+              `🛣️ Route via point active (${viaRoutes[0].durationMins}m, ${viaRoutes[0].distanceKm}km)`
+            );
+            setTimeout(() => setPinnedConfirmationToast(null), 3500);
+          }
+        }
+      } catch (err) {
+        console.warn('[GoogleMapView] Error routing via point:', err);
+        setPinnedConfirmationToast('No drivable road route found through this point');
+        setTimeout(() => setPinnedConfirmationToast(null), 3000);
+      } finally {
+        setIsCalculatingPointRoute(false);
+      }
+    },
+    [checkIfPointIsOnRoute, activeDisplayRoutes, members, currentUserId, rendezvous, onRoutesCalculated]
+  );
+
   const handleDropPinAtCoords = useCallback((lat: number, lng: number, categoryOverride?: string) => {
     if (!onAddWaypoint) return;
     const cat = categoryOverride || selectedPinCategory;
@@ -389,30 +641,18 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
   const clickHandlerRef = useRef<(lat: number, lng: number) => void>();
   clickHandlerRef.current = (lat: number, lng: number) => {
-    if (isPointingPinMode) {
-      handleDropPinAtCoords(lat, lng);
-    } else if (isSettingRendezvous) {
+    if (isSettingRendezvous) {
       onSelectLocationForRendezvous(lat, lng);
     } else if (pinningWaypoint && onPlaceWaypointOnMap) {
       onPlaceWaypointOnMap(lat, lng);
+    } else {
+      // User tapped map: check route and route through point!
+      handlePointLocation(lat, lng);
+      if (isPointingPinMode) {
+        setIsPointingPinMode(false);
+      }
     }
-    // Generic map clicks do NOT force recenter or zoom out
   };
-
-  // Keep track of active calculated routes
-  const [activeDisplayRoutes, setActiveDisplayRoutes] = useState<TravelRoute[]>(routes);
-
-  // Sync / merge active display routes when remote group routes change
-  useEffect(() => {
-    if (routes && routes.length > 0) {
-      setActiveDisplayRoutes((prev) => {
-        if (!prev || prev.length === 0) return routes;
-        const myLocalRoutes = prev.filter((r) => !r.forUserId || r.forUserId === currentUserId);
-        const remoteRoutes = routes.filter((r) => r.forUserId && r.forUserId !== currentUserId);
-        return [...myLocalRoutes, ...remoteRoutes];
-      });
-    }
-  }, [routes, currentUserId]);
 
   // Load Google Maps Script
   useEffect(() => {
@@ -1187,6 +1427,110 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   }, [rendezvous, isLoaded]);
 
   // =========================================================================
+  // RENDER POINTED LOCATION BEACON (CREATIVE, MINIMAL GLOWING BADGE)
+  // =========================================================================
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+
+    if (pointedOverlayRef.current) {
+      pointedOverlayRef.current.setMap(null);
+      pointedOverlayRef.current = null;
+    }
+
+    if (!pointedPoint) return;
+
+    class PointedPointOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null;
+      private position: google.maps.LatLng;
+
+      constructor(lat: number, lng: number) {
+        super();
+        this.position = new google.maps.LatLng(lat, lng);
+      }
+
+      onAdd() {
+        this.div = document.createElement('div');
+        this.div.style.position = 'absolute';
+        this.div.style.transform = 'translate(-50%, -100%)';
+        this.div.style.cursor = 'pointer';
+        this.div.className = 'pointer-events-auto select-none';
+
+        const isGreen = Boolean(pointedPoint?.isOnRoute);
+        const label = isGreen
+          ? 'On Route'
+          : pointedPoint?.distanceKm
+          ? `${pointedPoint.distanceKm} km • via Point`
+          : 'Route via Point';
+
+        this.div.innerHTML = `
+          <div class="flex flex-col items-center">
+            <!-- Radiant Pulsing Beacon -->
+            <div class="relative flex items-center justify-center">
+              <span class="absolute w-8 h-8 rounded-full ${isGreen ? 'bg-[#34C759]/35' : 'bg-[#00f0ff]/35'} animate-ping"></span>
+              <span class="absolute w-5 h-5 rounded-full ${isGreen ? 'bg-[#34C759]/25 border border-[#34C759]/70' : 'bg-[#00f0ff]/25 border border-[#00f0ff]/70'}"></span>
+              <div class="w-3.5 h-3.5 rounded-full ${isGreen ? 'bg-[#34C759] shadow-[0_0_12px_#34C759]' : 'bg-[#00f0ff] shadow-[0_0_12px_#00f0ff]'} border border-white/90"></div>
+            </div>
+
+            <!-- Stem -->
+            <div class="w-[2px] h-2.5 ${isGreen ? 'bg-[#34C759]' : 'bg-[#00f0ff]'} shadow-[0_0_6px_currentColor]"></div>
+
+            <!-- Minimal Creative Glass Pill -->
+            <div class="apple-glass-pill px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xl flex items-center gap-1.5 border border-white/20 mt-0.5">
+              <span>${isGreen ? '✨' : '🛣️'}</span>
+              <span class="${isGreen ? 'text-[#34C759]' : 'text-white'}">${label}</span>
+              ${!isGreen ? '<button id="clear-pointed-btn" class="ml-1 text-slate-400 hover:text-white px-1 text-xs" title="Clear detour">✕</button>' : ''}
+            </div>
+          </div>
+        `;
+
+        const clearBtn = this.div.querySelector('#clear-pointed-btn');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleClearPointedRoute();
+          });
+        }
+
+        const panes = this.getPanes();
+        if (panes && panes.overlayMouseTarget && this.div) {
+          panes.overlayMouseTarget.appendChild(this.div);
+        }
+      }
+
+      draw() {
+        try {
+          if (!this.div) return;
+          const projection = this.getProjection();
+          if (!projection) return;
+          const pos = projection.fromLatLngToDivPixel(this.position);
+          if (pos) {
+            this.div.style.left = `${pos.x}px`;
+            this.div.style.top = `${pos.y}px`;
+          }
+        } catch (e) {}
+      }
+
+      onRemove() {
+        if (this.div?.parentNode) {
+          this.div.parentNode.removeChild(this.div);
+          this.div = null;
+        }
+      }
+    }
+
+    const overlay = new PointedPointOverlay(pointedPoint.lat, pointedPoint.lng);
+    overlay.setMap(mapInstanceRef.current);
+    pointedOverlayRef.current = overlay;
+
+    return () => {
+      if (pointedOverlayRef.current) {
+        pointedOverlayRef.current.setMap(null);
+        pointedOverlayRef.current = null;
+      }
+    };
+  }, [pointedPoint, handleClearPointedRoute]);
+
+  // =========================================================================
   // RENDER CUSTOM REAL-TIME AVATAR OVERLAYS (PERSISTENT & NON-FLICKERING)
   // =========================================================================
   useEffect(() => {
@@ -1712,19 +2056,19 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       {/* Floating Map Actions: Pointing Pin & Fit Squad (Left Dock clear of right sidebar) */}
       {!isTripActive && (
         <div className="absolute left-3 bottom-24 sm:left-4 sm:bottom-28 z-20 pointer-events-auto flex flex-col items-start gap-2">
-          {/* Pointing Pin / Mark Map Button */}
+          {/* Point Route Button */}
           <button
             type="button"
             onClick={() => setIsPointingPinMode((prev) => !prev)}
-            className={`px-3.5 py-2.5 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.85)] flex items-center gap-2 text-xs font-black transition active:scale-95 border backdrop-blur-2xl cursor-pointer ${
+            className={`apple-glass-pill px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition active:scale-95 border apple-pressable cursor-pointer ${
               isPointingPinMode
-                ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.7)] animate-pulse'
-                : 'bg-[#05080e]/95 text-amber-300 border-amber-500/50 hover:bg-slate-900 hover:border-amber-400'
+                ? 'bg-[#007AFF]/25 border-[#007AFF] text-[#007AFF] shadow-[0_0_20px_rgba(0,122,255,0.4)]'
+                : 'text-slate-200 hover:text-white border-white/15'
             }`}
-            title={isPointingPinMode ? 'Exit Pointing Pin Mode' : 'Point & Mark on Main Map'}
+            title={isPointingPinMode ? 'Exit Point Route' : 'Point on map to route'}
           >
-            <span className="text-base">📍</span>
-            <span>{isPointingPinMode ? 'Aiming Pin...' : 'Point & Mark'}</span>
+            <span className="text-sm">🎯</span>
+            <span className="hidden sm:inline">{isPointingPinMode ? 'Aiming...' : 'Point Route'}</span>
           </button>
 
           {/* Fit Squad Button */}
@@ -1744,131 +2088,60 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
         </div>
       )}
 
-      {/* 1. Precision Pointing Pin Reticle at Viewport Center (Human-Centric Direct Aim) */}
+      {/* 1. Precision Pointing Reticle at Viewport Center (Minimal & Creative) */}
       {isPointingPinMode && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-40 flex flex-col items-center select-none">
-          {/* Animated 3D Floating Pin */}
-          <div className="relative -top-8 flex flex-col items-center animate-bounce">
-            <div className="px-2 py-0.5 rounded-full bg-slate-950/95 border border-amber-400 text-amber-300 text-[9px] font-black uppercase tracking-wider mb-1 shadow-2xl flex items-center gap-1 backdrop-blur-md">
-              <span>AIM ROAD SPOT</span>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-amber-500/30 border-2 border-amber-300 shadow-[0_0_25px_#f59e0b] flex items-center justify-center text-2xl backdrop-blur-md">
-              📍
-            </div>
-            <div className="w-1.5 h-3.5 bg-amber-400 rounded-b-full shadow-[0_0_10px_#f59e0b]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-40 flex flex-col items-center select-none animate-fade-in">
+          {/* Creative Floating Glass Pill */}
+          <div className="mb-2 px-3 py-1 rounded-full apple-glass-pill text-[#007AFF] text-[11px] font-bold tracking-wide shadow-2xl flex items-center gap-1.5 animate-pulse border border-[#007AFF]/40">
+            <span>🎯</span>
+            <span>Tap map or aim to route</span>
           </div>
 
-          {/* Precision Target Crosshair Ring */}
-          <div className="w-8 h-8 -mt-4 rounded-full border-2 border-amber-400/90 shadow-[0_0_15px_#f59e0b] flex items-center justify-center relative">
-            <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#f59e0b]"></div>
-            <div className="absolute w-3.5 h-0.5 bg-amber-400/80 -left-2"></div>
-            <div className="absolute w-3.5 h-0.5 bg-amber-400/80 -right-2"></div>
-            <div className="absolute h-3.5 w-0.5 bg-amber-400/80 -top-2"></div>
-            <div className="absolute h-3.5 w-0.5 bg-amber-400/80 -bottom-2"></div>
+          {/* Minimalist Radiant Crosshair Ring */}
+          <div className="w-9 h-9 rounded-full border border-cyan-400/80 shadow-[0_0_20px_rgba(0,240,255,0.6)] flex items-center justify-center relative">
+            <div className="w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_8px_#00f0ff]" />
+            <div className="absolute w-2.5 h-[1px] bg-cyan-400 -left-1" />
+            <div className="absolute w-2.5 h-[1px] bg-cyan-400 -right-1" />
+            <div className="absolute h-2.5 w-[1px] bg-cyan-400 -top-1" />
+            <div className="absolute h-2.5 w-[1px] bg-cyan-400 -bottom-1" />
           </div>
         </div>
       )}
 
-      {/* 2. Top Guidance Banner (Clean, Non-Intrusive) */}
+      {/* 2. Minimal Creative Bottom Dock for Point Mode */}
       {isPointingPinMode && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2 animate-fade-in max-w-[95%]">
-          <div className="bg-[#05080e]/95 backdrop-blur-2xl border-2 border-amber-500/80 text-amber-300 font-black px-4 py-2 rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.85)] flex items-center gap-2 text-xs">
-            <span className="text-base animate-pulse">📍</span>
-            <span>Aim crosshair at road or tap map directly to drop pin</span>
-          </div>
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2 animate-fade-in select-none">
+          <button
+            type="button"
+            onClick={() => {
+              const center = mapInstanceRef.current?.getCenter();
+              if (center) {
+                handlePointLocation(center.lat(), center.lng());
+                setIsPointingPinMode(false);
+              }
+            }}
+            className="apple-glass-pill px-4 py-2 rounded-full text-xs font-bold text-white shadow-2xl flex items-center gap-2 border border-cyan-400/50 bg-cyan-950/50 hover:bg-cyan-900/60 apple-pressable cursor-pointer"
+          >
+            <span>🎯</span>
+            <span>Route via Center</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsPointingPinMode(false)}
-            className="bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold px-3 py-2 rounded-full border border-slate-700 shadow-xl text-xs cursor-pointer active:scale-95"
+            className="w-8 h-8 rounded-full apple-glass-pill text-slate-400 hover:text-white flex items-center justify-center border border-white/15 apple-pressable cursor-pointer text-xs"
+            title="Cancel"
           >
-            ✕ Exit
+            ✕
           </button>
         </div>
       )}
 
-      {/* 3. Pinned Confirmation Toast */}
+      {/* 3. Toast Notification (Minimal Glass Pill) */}
       {pinnedConfirmationToast && (
-        <div className="absolute top-32 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-fade-in">
-          <div className="px-4 py-2 rounded-full bg-slate-950/95 border-2 border-emerald-400 text-emerald-300 font-black text-xs shadow-2xl flex items-center gap-2 backdrop-blur-xl">
-            <span>✨</span>
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-fade-in">
+          <div className="px-4 py-1.5 rounded-full apple-glass-pill border border-white/20 text-white font-bold text-xs shadow-2xl flex items-center gap-2">
             <span>{pinnedConfirmationToast}</span>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Bottom Action Palette (Docked Cleanly at Bottom Edge, NOT in middle of map) */}
-      {isPointingPinMode && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 pointer-events-auto w-[96%] max-w-2xl animate-fade-in font-['Plus_Jakarta_Sans',sans-serif]">
-          <div className="bg-[#05080e]/95 backdrop-blur-2xl border-2 border-amber-500/70 rounded-3xl p-3 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <span className="text-amber-400 font-mono text-[11px] font-black uppercase tracking-wider">
-                  📍 1-Tap Mark at Aimed Road Spot:
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDropAtMyGPS()}
-                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer"
-                  title="Drop at your vehicle's current live location"
-                >
-                  <span>📡 At My GPS</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPointingPinMode(false)}
-                  className="px-2 py-1 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
-                >
-                  ✕ Done
-                </button>
-              </div>
-            </div>
-
-            {/* 1-Tap Category Grid */}
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-2">
-              {[
-                { id: 'speed-breaker', label: 'Breaker', icon: '🛑' },
-                { id: 'sharp-turn', label: 'Sharp Turn', icon: '↩️' },
-                { id: 'pothole', label: 'Pothole', icon: '🕳️' },
-                { id: 'police', label: 'Police', icon: '👮' },
-                { id: 'fuel', label: 'Fuel Stop', icon: '⛽' },
-                { id: 'rest', label: 'Rest Area', icon: '☕' },
-                { id: 'checkpoint', label: 'Meeting Pin', icon: '📍' },
-              ].map((item) => {
-                const isSelected = selectedPinCategory === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPinCategory(item.id);
-                      handleDropAtAimedSpot(item.id);
-                    }}
-                    className={`py-2 px-1 rounded-2xl font-black text-xs flex flex-col items-center justify-center gap-1 transition active:scale-95 border cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.6)]'
-                        : 'bg-slate-900/80 text-slate-200 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    <span className="text-[10px] truncate max-w-full">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Main Action Bar: Drop at Aimed Spot Button */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDropAtAimedSpot()}
-                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.6)] flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
-              >
-                <span>📍</span>
-                <span>Mark Aimed Spot on Road</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
