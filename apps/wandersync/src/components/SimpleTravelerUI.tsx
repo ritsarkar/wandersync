@@ -1231,29 +1231,24 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                     e.stopPropagation();
                     onToggleLocationSharing();
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold apple-pressable transition ${
+                  className={`flex items-center justify-center w-9 h-9 rounded-full border apple-pressable transition ${
                     isSharingLocation
-                      ? 'bg-[#34C759]/20 border-[#34C759]/40 text-[#34C759]'
-                      : 'bg-white/10 border-white/15 text-slate-400'
+                      ? 'bg-[#34C759]/20 border-[#34C759]/40'
+                      : 'bg-white/10 border-white/15'
                   }`}
+                  title={isSharingLocation ? 'GPS Live' : 'GPS Off'}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      isSharingLocation ? 'bg-[#34C759] animate-ping' : 'bg-slate-500'
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      isSharingLocation ? 'bg-[#34C759] shadow-[0_0_8px_#34C759] animate-pulse' : 'bg-slate-500'
                     }`}
                   />
-                  <span className="apple-caption font-bold">{isSharingLocation ? 'GPS Live' : 'GPS Off'}</span>
                 </button>
 
                 {/* Center: Destination / Status summary */}
                 <div className="min-w-0 flex-1 text-center px-1">
                   <div className="text-xs font-bold text-white truncate apple-headline">
-                    {rendezvous ? rendezvous.title.replace('🎯 ', '') : 'Tap to set destination'}
-                  </div>
-                  <div className="text-[10px] text-blue-400 apple-caption apple-tabular">
-                    {routes.length > 0
-                      ? `🛣️ ${routes.length} routes active`
-                      : `👥 ${members.length} friends connected`}
+                    {rendezvous ? rendezvous.title.replace('🎯 ', '') : 'Set destination'}
                   </div>
                 </div>
 
@@ -1265,18 +1260,19 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                       e.stopPropagation();
                       onToggleTripActive();
                     }}
-                    className="px-3.5 py-1.5 rounded-full bg-[#007AFF] text-white font-bold text-xs shadow-lg shadow-blue-500/30 border-t border-white/30 flex items-center gap-1 apple-pressable"
+                    className="w-9 h-9 rounded-full bg-[#007AFF] text-white font-bold text-sm shadow-lg shadow-blue-500/30 border-t border-white/30 flex items-center justify-center apple-pressable"
+                    title="Start Trip"
                   >
-                    <span>🚀 Start</span>
+                    <span>🚀</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => mobileSheet.snapTo('half')}
-                    className="px-3 py-1.5 rounded-full bg-white/10 text-white font-semibold text-xs flex items-center gap-1 border border-white/15 apple-pressable"
+                    className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center border border-white/15 apple-pressable"
+                    title="Open routes"
                   >
-                    <span>Routes</span>
-                    <ChevronUp className="w-3.5 h-3.5 text-blue-400" />
+                    <ChevronUp className="w-4 h-4 text-blue-400" />
                   </button>
                 )}
               </div>
@@ -1286,11 +1282,9 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
             {isMobileDrawerOpen && (
               <div className="flex items-center justify-between pb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider apple-headline">
-                    Convoy Dashboard
-                  </span>
-                  <span className="text-[10px] text-[#34C759] font-bold bg-[#34C759]/20 px-2.5 py-0.5 rounded-full apple-tabular">
-                    {members.length} Online
+                  <span className="text-sm">📡</span>
+                  <span className="text-[10px] text-[#34C759] font-bold bg-[#34C759]/20 px-2 py-0.5 rounded-full apple-tabular">
+                    {members.length}
                   </span>
                 </div>
                 <button
@@ -1299,10 +1293,10 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                     e.stopPropagation();
                     mobileSheet.snapTo('peek');
                   }}
-                  className="text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10 flex items-center gap-1 text-[11px] font-semibold apple-pressable"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400 hover:text-white apple-pressable"
+                  title="Collapse"
                 >
-                  <span>Map view</span>
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-4.5 h-4.5" />
                 </button>
               </div>
             )}
@@ -1315,10 +1309,10 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
               {onToggleTripActive && (
                 <button
                   onClick={onToggleTripActive}
-                  className="w-full py-3 px-4 rounded-2xl font-bold text-xs tracking-wide shadow-xl flex items-center justify-center gap-2 bg-[#007AFF] text-white border-t border-white/30 shadow-blue-500/30 apple-pressable cursor-pointer"
+                  className="w-full py-3 px-4 rounded-2xl font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2.5 bg-[#007AFF] text-white border-t border-white/30 shadow-blue-500/30 apple-pressable cursor-pointer"
                 >
-                  <span className="text-base">🚀</span>
-                  <span className="uppercase font-extrabold tracking-wider">START CONVOY TRIP (1-4 COUNTDOWN)</span>
+                  <span className="text-lg">🚀</span>
+                  <span className="uppercase font-extrabold tracking-wider">GO</span>
                 </button>
               )}
 
@@ -1330,29 +1324,39 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                   className={`apple-segmented-item ${
                     mobileActiveTab === 'routes' ? 'apple-segmented-item-active' : ''
                   }`}
+                  title="Routes"
                 >
-                  <span>🛣️</span>
-                  <span>Routes</span>
+                  <span className="text-base">🛣️</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMobileActiveTab('friends')}
-                  className={`apple-segmented-item ${
+                  className={`apple-segmented-item relative ${
                     mobileActiveTab === 'friends' ? 'apple-segmented-item-active' : ''
                   }`}
+                  title="Squad"
                 >
-                  <span>👥</span>
-                  <span className="apple-tabular">Squad ({members.length})</span>
+                  <span className="text-base">👥</span>
+                  {members.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#007AFF] text-[9px] font-bold text-white flex items-center justify-center apple-tabular">
+                      {members.length}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setMobileActiveTab('stops')}
-                  className={`apple-segmented-item ${
+                  className={`apple-segmented-item relative ${
                     mobileActiveTab === 'stops' ? 'apple-segmented-item-active' : ''
                   }`}
+                  title="Stops"
                 >
-                  <span>🚧</span>
-                  <span className="apple-tabular">Stops ({waypoints.length})</span>
+                  <span className="text-base">🚧</span>
+                  {waypoints.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#FF9500] text-[9px] font-bold text-white flex items-center justify-center apple-tabular">
+                      {waypoints.length}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -1368,8 +1372,7 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                       <>
                         <div>
                           <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                            <span>🛣️ Your Route Options</span>
-                            <span className="text-[10px] text-cyan-400 font-normal">Tap to choose</span>
+                            <span>🛣️ My Routes</span>
                           </div>
                           <div className="space-y-2">
                             {myRoutes.map((route, idx) => {
@@ -1432,8 +1435,7 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                         {otherFriends.length > 0 && (
                           <div className="pt-2 border-t border-slate-800/80">
                             <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                              <span>👥 Squad Routes ({otherFriends.length})</span>
-                              <span className="text-[10px] text-slate-400 font-normal">1 route per friend</span>
+                              <span>👥 Squad ({otherFriends.length})</span>
                             </div>
                             <div className="space-y-2">
                               {otherFriends.map((friend, fIdx) => {

@@ -219,10 +219,10 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 setTimeout(() => setReportToast(null), 3200);
               }}
               className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/35 border border-rose-500/50 text-rose-200 font-bold text-[11px] sm:text-xs flex items-center gap-1 apple-pressable cursor-pointer shrink-0"
-              title="Mark Speed Breaker / Bump at current spot"
+              title="Speed Breaker"
             >
-              <span className="text-sm">🛑</span>
-              <span>Breaker</span>
+              <span className="text-base sm:text-sm">🛑</span>
+              <span className="hidden sm:inline">Breaker</span>
             </button>
 
             {/* ↩️ Sharp Turn */}
@@ -235,10 +235,10 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 setTimeout(() => setReportToast(null), 3200);
               }}
               className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/50 text-amber-200 font-bold text-[11px] sm:text-xs flex items-center gap-1 apple-pressable cursor-pointer shrink-0"
-              title="Mark Dangerous / Sharp Turn ahead"
+              title="Sharp Turn"
             >
-              <span className="text-sm">↩️</span>
-              <span>Sharp Turn</span>
+              <span className="text-base sm:text-sm">↩️</span>
+              <span className="hidden sm:inline">Sharp Turn</span>
             </button>
 
             {/* 🕳️ Pothole / Bad Road */}
@@ -251,10 +251,10 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 setTimeout(() => setReportToast(null), 3200);
               }}
               className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/35 border border-orange-500/50 text-orange-200 font-bold text-[11px] sm:text-xs flex items-center gap-1 apple-pressable cursor-pointer shrink-0"
-              title="Mark Pothole / Damaged Road"
+              title="Pothole"
             >
-              <span className="text-sm">🕳️</span>
-              <span>Pothole</span>
+              <span className="text-base sm:text-sm">🕳️</span>
+              <span className="hidden sm:inline">Pothole</span>
             </button>
 
             {/* 👮 Police Checkpoint */}
@@ -267,10 +267,10 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 setTimeout(() => setReportToast(null), 3200);
               }}
               className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/35 border border-blue-500/50 text-blue-200 font-bold text-[11px] sm:text-xs flex items-center gap-1 apple-pressable cursor-pointer shrink-0"
-              title="Mark Police Checkpoint / Speed Radar"
+              title="Police Checkpoint"
             >
-              <span className="text-sm">👮</span>
-              <span>Police</span>
+              <span className="text-base sm:text-sm">👮</span>
+              <span className="hidden sm:inline">Police</span>
             </button>
 
             {/* 📍 Point & Mark Aiming Reticle Button */}
@@ -285,8 +285,8 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 }`}
                 title="Aim and mark any spot on the road with crosshair reticle"
               >
-                <span className="text-sm">📍</span>
-                <span>{isPointingPinMode ? 'Aiming...' : 'Point & Mark'}</span>
+                <span className="text-base sm:text-sm">📍</span>
+                <span className="hidden sm:inline">{isPointingPinMode ? 'Aiming...' : 'Point & Mark'}</span>
               </button>
             )}
           </div>
@@ -320,8 +320,8 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
                 }`}
                 title={isSimulating ? 'Stop Drive Simulation' : 'Simulate Live Convoy Drive along Road'}
               >
-                {isSimulating ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
-                <span>{isSimulating ? 'Stop' : 'Sim'}</span>
+                {isSimulating ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span className="hidden sm:inline">{isSimulating ? 'Stop' : 'Sim'}</span>
               </button>
             )}
 
@@ -336,8 +336,8 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
               }`}
               title="Toggle 3D Cockpit Perspective vs 2D Flat Plan"
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>{is3DTiltActive ? '3D' : '2D'}</span>
+              <Compass className="w-4 h-4" />
+              <span className="hidden sm:inline">{is3DTiltActive ? '3D' : '2D'}</span>
             </button>
 
             {/* Exit Drive Mode Button */}
@@ -347,8 +347,8 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
               className="px-3 py-1.5 sm:py-2 rounded-2xl apple-glass-pill hover:bg-rose-500/20 text-[#FF3B30] font-bold text-[11px] sm:text-xs flex items-center gap-1.5 apple-pressable cursor-pointer"
               title="Exit drive mode back to squad overview"
             >
-              <X className="w-3.5 h-3.5" />
-              <span>Exit</span>
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Exit</span>
             </button>
           </div>
         </div>
