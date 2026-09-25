@@ -371,22 +371,6 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
             </button>
           </div>
 
-          {/* Start Trip / Drive Mode Button */}
-          {onToggleTripActive && (
-            <button
-              onClick={onToggleTripActive}
-              className={`px-3.5 py-2.5 rounded-2xl font-black text-xs shadow-2xl transition active:scale-95 flex items-center gap-1.5 border ${
-                isTripActive
-                  ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 shadow-[0_0_16px_rgba(239,68,68,0.7)]'
-                  : 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-slate-950 border-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.6)] animate-pulse'
-              }`}
-              title={isTripActive ? 'Exit 3D Drive Mode' : 'Start Trip in V2V 3D Cockpit'}
-            >
-              <span className="text-sm">{isTripActive ? '🛑' : '🚀'}</span>
-              <span>{isTripActive ? 'Exit Drive' : 'Start Trip'}</span>
-            </button>
-          )}
-
 
           {/* Universal Search Destination Button */}
           <div className="flex items-center gap-1.5">
@@ -660,18 +644,6 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
               </div>
             )}
 
-            {/* Start Trip Action Button */}
-            {onToggleTripActive && (
-              <div className="mt-3">
-                <button
-                  onClick={onToggleTripActive}
-                  className="w-full py-3.5 px-4 rounded-2xl font-black text-xs shadow-2xl flex items-center justify-center gap-2.5 transition active:scale-95 bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-slate-950 border border-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.6)] cursor-pointer"
-                >
-                  <span className="text-base">🚀</span>
-                  <span>START CONVOY TRIP (COUNTDOWN 1-4)</span>
-                </button>
-              </div>
-            )}
 
             {/* Dedicated Trip Destination & Search Card in Sidebar */}
             <div className="mt-3.5 p-3 rounded-2xl bg-slate-900/90 border border-blue-500/40 shadow-xl space-y-2.5">
