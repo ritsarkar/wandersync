@@ -64,6 +64,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
 
   // Fields for Creation
   const [createTripCode] = useState(() => {
+    if (urlParam) return urlParam.toUpperCase();
     return `TRIP-${Math.floor(100 + Math.random() * 900)}`;
   });
   const [creatorName, setCreatorName] = useState(() => localStorage.getItem('wandersync_user_name') || '');
@@ -164,14 +165,16 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
     if (!creatorName.trim()) return;
 
     const chosenVehicle = VEHICLES.find((v) => v.mode === selectedMode);
+    const targetGroupId = createTripCode.trim().toUpperCase();
+    const isNewTrip = !urlParam && (!tripPreview || !tripPreview.membersCount);
 
     onJoin({
-      groupId: createTripCode.trim().toUpperCase(),
+      groupId: targetGroupId,
       name: creatorName.trim(),
       avatar: chosenVehicle?.icon || '🚗',
-      color: '#10b981',
+      color: isNewTrip ? '#10b981' : '#ec4899',
       mode: selectedMode,
-      isCreator: true,
+      isCreator: isNewTrip,
       initialDestination: selectedDestination
         ? {
             lat: selectedDestination.lat,
@@ -392,7 +395,7 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
                   type="submit"
                   className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer mt-1 apple-pressable"
                 >
-                  <span>Start Trip</span>
+                  <span>{urlParam ? `Join Convoy (${createTripCode})` : 'Start Trip'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>

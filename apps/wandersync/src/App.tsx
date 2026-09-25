@@ -129,10 +129,12 @@ export const App: React.FC = () => {
         setIsTripActive((group as any).isTripActive);
       }
       // Check if current user is the leader/creator
-      const amILeader = group.creatorId === currentUserId ||
-        (!group.creatorId) ||
-        (group.members.length <= 1) ||
-        (localStorage.getItem(`wandersync_creator_${group.id}`) === 'true');
+      const amILeader = Boolean(
+        group.creatorId && group.creatorId === currentUserId
+      ) || (
+        localStorage.getItem(`wandersync_creator_${group.id}`) === 'true' &&
+        (!group.creatorId || group.creatorId === currentUserId)
+      );
       setIsLeader(amILeader);
     });
 
@@ -486,11 +488,9 @@ export const App: React.FC = () => {
         localStorage.setItem(`wandersync_creator_${data.groupId}`, 'true');
       } catch (e) {}
     } else {
+      setIsLeader(false);
       try {
-        if (localStorage.getItem(`wandersync_creator_${data.groupId}`) === 'true') {
-          setIsLeader(true);
-          data.isCreator = true;
-        }
+        localStorage.removeItem(`wandersync_creator_${data.groupId}`);
       } catch (e) {}
     }
 
@@ -512,13 +512,29 @@ export const App: React.FC = () => {
       localStorage.setItem('wandersync_user_mode', data.mode);
     } catch (e) {}
 
-    // Register user immediately in group with real location if already fetched, or locating status
+    // Register user immediately in group with real location if already fetched, or a smart starting approach
+    let initialLoc = realLocation;
+    if (!initialLoc && !data.isCreator) {
+      const leaderMember = members.find((m) => m.isLeader && m.location);
+      if (leaderMember?.location) {
+        // Position friend near leader on approach road so friend vehicle & route appear immediately
+        initialLoc = {
+          lat: +(leaderMember.location.lat - 0.035).toFixed(5),
+          lng: +(leaderMember.location.lng - 0.025).toFixed(5),
+          speed: 38,
+          heading: 20,
+          accuracy: 15,
+          timestamp: Date.now(),
+        };
+      }
+    }
+
     const initialMember: TravelerMember = {
       ...updatedProfile,
       isLeader: Boolean(data.isCreator),
-      location: realLocation || undefined,
-      trail: [],
-      status: realLocation ? 'active' : 'locating',
+      location: initialLoc || undefined,
+      trail: initialLoc ? [[initialLoc.lat, initialLoc.lng]] : [],
+      status: initialLoc ? 'active' : 'locating',
       lastSeen: Date.now(),
     };
     setMembers((prev) => [initialMember, ...prev.filter((m) => m.id !== currentUserId)]);
@@ -797,10 +813,12 @@ export const App: React.FC = () => {
             }
           }}
           followMe={followMe}
+          isLeader={isLeader}
           onLoadError={() => setUseGoogleMaps(false)}
           onRoutesCalculated={(newRoutes) => {
             setRoutes((prev) => {
-              const others = prev.filter((r) => r.forUserId && r.forUserId !== currentUserId);
+              const incomingUserIds = new Set(newRoutes.filter((r) => r.forUserId).map((r) => r.forUserId));
+              const others = prev.filter((r) => r.forUserId && !incomingUserIds.has(r.forUserId));
               return [...others, ...newRoutes];
             });
             socketService.setRoutes(groupId, newRoutes, currentUserId);

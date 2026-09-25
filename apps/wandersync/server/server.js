@@ -248,11 +248,10 @@ io.on('connection', (socket) => {
   socket.on('join_group', async ({ groupId, profile }) => {
     const group = getOrCreateGroup(groupId);
     currentGroupId = group.id;
-    // Check if group has an active, connected, non-simulated creator
-    const existingCreator = group.creatorId ? group.members.get(group.creatorId) : null;
-    const isCreatorOnline = existingCreator && existingCreator.status !== 'offline' && !existingCreator.isSimulated;
-
-    if (group.creatorId === null || profile.isCreator || profile.isLeader || !isCreatorOnline) {
+    // Check if group already has an established creator
+    if (!group.creatorId) {
+      group.creatorId = profile.id;
+    } else if (profile.isCreator && !group.members.has(group.creatorId)) {
       group.creatorId = profile.id;
     }
 
@@ -342,11 +341,16 @@ io.on('connection', (socket) => {
               color: memberData.color || (idx === 0 ? '#00f0ff' : '#ec4899'),
               tag: idx === 0 ? `Fastest for ${memberData.name}` : `Alt ${idx + 1} for ${memberData.name}`,
             }));
+            if (!memberData.assignedRouteId) {
+              memberData.assignedRouteId = userRouteFormatted[0].id;
+            }
             group.routes = [
               ...(group.routes || []).filter((r) => r.forUserId !== memberData.id),
               ...userRouteFormatted,
             ];
+            io.to(currentGroupId).emit('member_route_updated', { userId: memberData.id, routeId: memberData.assignedRouteId });
             io.to(currentGroupId).emit('routes_updated', group.routes);
+            io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
             scheduleSaveGroups(groups);
           }
         })
@@ -433,11 +437,16 @@ io.on('connection', (socket) => {
               color: member.color || (idx === 0 ? '#00f0ff' : '#ec4899'),
               tag: idx === 0 ? `Fastest for ${member.name}` : `Alt ${idx + 1} for ${member.name}`,
             }));
+            if (!member.assignedRouteId) {
+              member.assignedRouteId = formatted[0].id;
+            }
             group.routes = [
               ...(group.routes || []).filter(r => r.forUserId !== member.id),
               ...formatted,
             ];
+            io.to(groupId).emit('member_route_updated', { userId: member.id, routeId: member.assignedRouteId });
             io.to(groupId).emit('routes_updated', group.routes);
+            io.to(groupId).emit('group_state_updated', serializeGroup(group));
             scheduleSaveGroups(groups);
           }
         }).catch((err) => console.warn('[Routes] Error calculating route on update_location:', err.message));
@@ -484,9 +493,9 @@ io.on('connection', (socket) => {
     const currentCreator = group.creatorId ? group.members.get(group.creatorId) : null;
     const isCreatorOnline = currentCreator && currentCreator.status !== 'offline' && !currentCreator.isSimulated;
 
-    // Only block if a DIFFERENT active human creator is online right now
-    if (group.creatorId && effectiveUserId && group.creatorId !== effectiveUserId && isCreatorOnline && group.members.size > 1) {
-      socket.emit('permission_denied', { message: 'Only the trip leader can set the meeting point' });
+    // Strict Admin Lock: Only trip creator/leader can set or change destination
+    if (group.creatorId && effectiveUserId && group.creatorId !== effectiveUserId) {
+      socket.emit('permission_denied', { message: 'Only the trip admin can set or change the destination.' });
       return;
     }
 
@@ -632,20 +641,18 @@ io.on('connection', (socket) => {
     if (!group) return;
 
     const targetUserId = userId || currentUserId;
-    if (Array.isArray(routes) && targetUserId) {
-      // Keep other squad members' routes and update only this traveler's routes
-      const otherRoutes = (group.routes || []).filter(r => r.forUserId && r.forUserId !== targetUserId);
-      const myTaggedRoutes = routes.map(r => ({
+    if (Array.isArray(routes)) {
+      const incoming = routes.map((r) => ({
         ...r,
         forUserId: r.forUserId || targetUserId,
       }));
-      group.routes = [...otherRoutes, ...myTaggedRoutes];
-    } else if (Array.isArray(routes)) {
-      group.routes = routes;
+      const incomingUserIds = new Set(incoming.map((r) => r.forUserId));
+      const otherRoutes = (group.routes || []).filter((r) => !r.forUserId || !incomingUserIds.has(r.forUserId));
+      group.routes = [...otherRoutes, ...incoming];
+      io.to(groupId).emit('routes_updated', group.routes);
+      io.to(groupId).emit('group_state_updated', serializeGroup(group));
+      scheduleSaveGroups(groups);
     }
-
-    io.to(groupId).emit('routes_updated', group.routes);
-    scheduleSaveGroups(groups);
   });
 
   // 7. Chat Messages & Quick Radar Pings

@@ -60,6 +60,7 @@ interface GoogleMapViewProps {
   selectedMemberId: string | null;
   onSelectMember: (memberId: string | null) => void;
   followMe: boolean;
+  isLeader?: boolean;
   isTripActive?: boolean;
   is3DTiltActive?: boolean;
   isCornerMapSwapped?: boolean;
@@ -268,6 +269,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   selectedMemberId,
   onSelectMember,
   followMe,
+  isLeader = true,
   isTripActive = false,
   is3DTiltActive = true,
   isCornerMapSwapped = false,
@@ -355,12 +357,13 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     if (routes && routes.length > 0) {
       setActiveDisplayRoutes((prev) => {
         if (!prev || prev.length === 0) return routes;
-        const myLocalRoutes = prev.filter((r) => !r.forUserId || r.forUserId === currentUserId);
-        const remoteRoutes = routes.filter((r) => r.forUserId && r.forUserId !== currentUserId);
-        return [...myLocalRoutes, ...remoteRoutes];
+        // Merge routes per user: if incoming routes has routes for a user, use incoming; otherwise keep prev
+        const incomingUserIds = new Set(routes.filter((r) => r.forUserId).map((r) => r.forUserId));
+        const keptPrev = prev.filter((r) => r.forUserId && !incomingUserIds.has(r.forUserId));
+        return [...keptPrev, ...routes];
       });
     }
-  }, [routes, currentUserId]);
+  }, [routes]);
 
   // =========================================================================
   // CREATIVE & MINIMAL POINT-ON-MAP ROUTE ENGINE
@@ -642,7 +645,9 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const clickHandlerRef = useRef<(lat: number, lng: number) => void>();
   clickHandlerRef.current = (lat: number, lng: number) => {
     if (isSettingRendezvous) {
-      onSelectLocationForRendezvous(lat, lng);
+      if (isLeader) {
+        onSelectLocationForRendezvous(lat, lng);
+      }
     } else if (pinningWaypoint && onPlaceWaypointOnMap) {
       onPlaceWaypointOnMap(lat, lng);
     } else {
@@ -1054,14 +1059,16 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
     await Promise.all(promises);
 
-    if (myCalculatedRoutes.length > 0) {
+    if (myCalculatedRoutes.length > 0 || friendCalculatedRoutes.length > 0) {
       lastCalculatedParamsRef.current = currentFingerprint;
       // Merge this traveler's routes with existing remote squad routes
       const remoteRoutes = (routes || []).filter((r) => r.forUserId && r.forUserId !== currentUserId);
       const combined = [...myCalculatedRoutes, ...remoteRoutes, ...friendCalculatedRoutes];
       setActiveDisplayRoutes(combined);
-      // Publish ONLY this user's routes to the server so other members' routes are never overwritten!
-      if (onRoutesCalculated) onRoutesCalculated([...myCalculatedRoutes]);
+      // Publish both my routes and any computed friend routes so all squad members have them!
+      if (onRoutesCalculated) {
+        onRoutesCalculated([...myCalculatedRoutes, ...friendCalculatedRoutes]);
+      }
     }
   }, [rendezvous, members, currentUserId, isLoaded, onRoutesCalculated, routes]);
 
@@ -1091,8 +1098,11 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     // Clear old polylines
     polylinesRef.current.forEach((p) => p.setMap(null));
     polylinesRef.current = [];
-
-    const displayRoutes = activeDisplayRoutes.length > 0 ? activeDisplayRoutes : routes;
+    // Combine local active routes with all server group routes (ensuring no friend route is ever missed!)
+    const allRoutesMap = new Map<string, TravelRoute>();
+    (routes || []).forEach((r) => allRoutesMap.set(r.id, r));
+    (activeDisplayRoutes || []).forEach((r) => allRoutesMap.set(r.id, r));
+    const displayRoutes = Array.from(allRoutesMap.values());
     const myMember = members.find((m) => m.id === currentUserId);
     const myAssignedRouteId = myMember?.assignedRouteId;
 
@@ -1114,19 +1124,25 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
     const routesToDraw: RouteRenderItem[] = [];
 
-    // 1. Driver's Chosen Route (Electric Cyan #00f0ff)
+    // 1. Local Traveler's Chosen Route (Cyan for leader, distinct neon for friend)
     if (myChosenRoute && myChosenRoute.coordinates && myChosenRoute.coordinates.length >= 2) {
+      const myPrimaryColor = isLeader
+        ? DRIVER_PRIMARY_COLOR
+        : (myMember?.color && myMember.color !== '#00f0ff' && myMember.color !== '#3b82f6'
+            ? myMember.color
+            : '#ec4899');
+
       routesToDraw.push({
         route: myChosenRoute,
         isDriver: true,
         isSelected: true,
-        primaryColor: DRIVER_PRIMARY_COLOR,
-        ownerName: myMember?.name || 'You (Driver)',
+        primaryColor: myPrimaryColor,
+        ownerName: myMember?.name || (isLeader ? 'You (Admin)' : 'You'),
         ownerAvatar: myMember?.avatar || '🚗',
       });
     }
 
-    // 2. Driver Alternative Routes (Only before trip starts, subtle slate for tap-to-select)
+    // 2. Local Traveler Alternative Routes (Only before trip starts, subtle slate for tap-to-select)
     if (!isTripActive) {
       const myAlternatives = myRoutesList.filter((r) => r.id !== myChosenRoute?.id);
       myAlternatives.forEach((altRoute) => {
@@ -1136,7 +1152,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             isDriver: true,
             isSelected: false,
             primaryColor: '#64748b',
-            ownerName: myMember?.name || 'You (Driver)',
+            ownerName: myMember?.name || 'You',
             ownerAvatar: myMember?.avatar || '🚗',
           });
         }
@@ -1147,21 +1163,22 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     otherFriends.forEach((friend, fIdx) => {
       const friendRoutes = displayRoutes.filter((r) => r.forUserId === friend.id);
       const friendChosen = friend.assignedRouteId
-        ? friendRoutes.find((r) => r.id === friend.assignedRouteId) || friendRoutes[0]
+        ? friendRoutes.find((r) => r.id === friend.assignedRouteId) || displayRoutes.find((r) => r.id === friend.assignedRouteId) || friendRoutes[0]
         : friendRoutes[0];
 
       if (friendChosen && friendChosen.coordinates && friendChosen.coordinates.length >= 2) {
-        const friendColor =
-          friend.color && friend.color !== '#00f0ff' && friend.color !== '#3b82f6'
-            ? friend.color
-            : SQUAD_FRIEND_PALETTE[fIdx % SQUAD_FRIEND_PALETTE.length];
+        const friendColor = friend.isLeader
+          ? DRIVER_PRIMARY_COLOR
+          : (friend.color && friend.color !== '#00f0ff' && friend.color !== '#3b82f6'
+              ? friend.color
+              : SQUAD_FRIEND_PALETTE[fIdx % SQUAD_FRIEND_PALETTE.length]);
 
         routesToDraw.push({
           route: friendChosen,
           isDriver: false,
           isSelected: true,
           primaryColor: friendColor,
-          ownerName: friend.name,
+          ownerName: friend.name + (friend.isLeader ? ' (Admin)' : ''),
           ownerAvatar: friend.avatar || '🎒',
         });
       }

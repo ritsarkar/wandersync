@@ -372,23 +372,23 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
           </div>
 
 
-          {/* Universal Search Destination Button */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsLocateOpen(!isLocateOpen)}
-              className={`px-3.5 py-2.5 rounded-2xl font-black text-xs shadow-xl transition flex items-center gap-1.5 border cursor-pointer active:scale-95 ${
-                isLocateOpen
-                  ? 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400/50'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-              }`}
-              title="Search city, town, airport or mountain destination on Google Maps"
-            >
-              <Search className="w-4 h-4 text-white" />
-              <span>Search Destination</span>
-            </button>
+          {/* Universal Search Destination Button: Leader Only */}
+          {isLeader && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsLocateOpen(!isLocateOpen)}
+                className={`px-3.5 py-2.5 rounded-2xl font-black text-xs shadow-xl transition flex items-center gap-1.5 border cursor-pointer active:scale-95 ${
+                  isLocateOpen
+                    ? 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400/50'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                }`}
+                title="Search city, town, airport or mountain destination on Google Maps"
+              >
+                <Search className="w-4 h-4 text-white" />
+                <span>Search Destination</span>
+              </button>
 
-            {isLeader && (
               <button
                 type="button"
                 onClick={onToggleSetMeetingPoint}
@@ -402,8 +402,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                 <MapPin className="w-4 h-4 text-amber-400" />
                 <span>{isSettingMeetingPoint ? 'Tap Map' : 'Set on Map'}</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -688,29 +688,37 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                 </div>
               </div>
 
-              {/* Prominent Search Destination Button */}
-              <button
-                type="button"
-                onClick={() => setIsLocateOpen(true)}
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 border border-blue-400/50 transition active:scale-95 cursor-pointer"
-              >
-                <Search className="w-4 h-4" />
-                <span>{rendezvous ? 'Search & Change Destination' : 'Search Where You Want To Go'}</span>
-              </button>
+              {/* Destination Search / Set: Admin only! */}
+              {isLeader ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsLocateOpen(true)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 border border-blue-400/50 transition active:scale-95 cursor-pointer"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>{rendezvous ? 'Search & Change Destination' : 'Search Where You Want To Go'}</span>
+                  </button>
 
-              {/* Set Directly on Map Button */}
-              <button
-                type="button"
-                onClick={onToggleSetMeetingPoint}
-                className={`w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-                  isSettingMeetingPoint
-                    ? 'bg-amber-500 text-slate-950 border-amber-300 ring-2 ring-amber-400 font-black animate-pulse'
-                    : 'bg-slate-800/60 hover:bg-slate-800 text-amber-300 border-amber-500/30'
-                }`}
-              >
-                <MapPin className="w-4 h-4 text-amber-400" />
-                <span>{isSettingMeetingPoint ? 'Tap Anywhere on Map to Drop Pin' : 'Or Tap Directly on Map'}</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={onToggleSetMeetingPoint}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      isSettingMeetingPoint
+                        ? 'bg-amber-500 text-slate-950 border-amber-300 ring-2 ring-amber-400 font-black animate-pulse'
+                        : 'bg-slate-800/60 hover:bg-slate-800 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4 text-amber-400" />
+                    <span>{isSettingMeetingPoint ? 'Tap Anywhere on Map to Drop Pin' : 'Or Tap Directly on Map'}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-slate-800/50 border border-amber-500/30 text-[11px] text-slate-300 flex items-center gap-2 select-none shadow-sm">
+                  <span className="text-base">🔒</span>
+                  <span>Destination set by Trip Admin. Only admin can modify destination.</span>
+                </div>
+              )}
             </div>
 
             {/* Simple Routes Overview (How much time each route takes) */}
@@ -849,8 +857,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                   </div>
                                 </div>
 
-                                {/* Alternate Route Selection Pill for this Friend */}
-                                {friendRoutes.length > 1 && (
+                                {/* Alternate Route Selection Pill for this Friend (Admin only) */}
+                                {isLeader && friendRoutes.length > 1 && (
                                   <div className="pt-1.5 border-t border-slate-700/40 flex items-center justify-between gap-2">
                                     <span className="text-[10px] text-slate-400">Select route:</span>
                                     <div className="flex items-center gap-1">
@@ -1483,8 +1491,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Alternate Route Switcher Pills */}
-                                    {friendRoutes.length > 1 && (
+                                    {/* Alternate Route Switcher Pills (Admin only) */}
+                                    {isLeader && friendRoutes.length > 1 && (
                                       <div className="pt-1.5 border-t border-slate-700/40 flex items-center justify-between gap-2">
                                         <span className="text-[10px] text-slate-400">Select route:</span>
                                         <div className="flex items-center gap-1">
