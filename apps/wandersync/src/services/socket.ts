@@ -474,6 +474,9 @@ class SocketService {
       this.socket.emit('assign_route', { groupId, userId, routeId });
     }
     this.publishMqtt('events', { event: 'member_route_updated', userId, routeId });
+    if (userId) {
+      this.publishMqtt(`member_route/${userId}`, { event: 'member_route_updated', userId, routeId }, true);
+    }
   }
 
   setRendezvous(groupId: string, rendezvous: RendezvousPoint, userId?: string) {
@@ -497,6 +500,10 @@ class SocketService {
       this.socket.emit('set_routes', { groupId, routes, userId: effectiveUserId });
     }
     // Retain routes so newly joined squad members get immediate access to calculated paths!
+    // Publish to user-specific retained topic so Admin and Friend routes never clobber each other
+    if (effectiveUserId) {
+      this.publishMqtt(`routes/${effectiveUserId}`, { event: 'routes_updated', routes, senderId: effectiveUserId }, true);
+    }
     this.publishMqtt('routes', { event: 'routes_updated', routes, senderId: effectiveUserId }, true);
   }
 

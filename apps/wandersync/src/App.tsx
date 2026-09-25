@@ -23,6 +23,7 @@ import {
   TransportMode,
   Waypoint,
   TripCountdownEvent,
+  CandidateSearchLocation,
 } from './types';
 
 export const App: React.FC = () => {
@@ -33,6 +34,15 @@ export const App: React.FC = () => {
   });
 
   const [isJoined, setIsJoined] = useState(false);
+  const [availableSearchLocations, setAvailableSearchLocations] = useState<CandidateSearchLocation[]>([
+    { id: 'dest-manali', name: 'Manali', lat: 32.2432, lng: 77.1892, icon: '🏔️', formattedAddress: 'Manali, Himachal Pradesh', type: 'popular' },
+    { id: 'dest-shimla', name: 'Shimla', lat: 31.1048, lng: 77.1734, icon: '⛰️', formattedAddress: 'Shimla, Himachal Pradesh', type: 'popular' },
+    { id: 'dest-mussoorie', name: 'Mussoorie', lat: 30.4598, lng: 78.0644, icon: '🌲', formattedAddress: 'Mussoorie, Uttarakhand', type: 'popular' },
+    { id: 'dest-rishikesh', name: 'Rishikesh', lat: 30.0869, lng: 78.2676, icon: '🧘', formattedAddress: 'Rishikesh, Uttarakhand', type: 'popular' },
+    { id: 'dest-leh', name: 'Leh Ladakh', lat: 34.1526, lng: 77.5771, icon: '❄️', formattedAddress: 'Leh Ladakh', type: 'popular' },
+    { id: 'dest-goa', name: 'Goa Beaches', lat: 15.2993, lng: 74.1240, icon: '🌊', formattedAddress: 'Goa Beaches', type: 'popular' },
+  ]);
+  const [selectedCandidateLocation, setSelectedCandidateLocation] = useState<CandidateSearchLocation | null>(null);
   const [currentUserId] = useState(() => {
     try {
       const saved = sessionStorage.getItem('wandersync_user_id') || localStorage.getItem('wandersync_user_id');
@@ -826,6 +836,8 @@ export const App: React.FC = () => {
             new URLSearchParams(window.location.search).get('group') ||
             undefined
           }
+          onUpdateCandidateLocations={setAvailableSearchLocations}
+          selectedCandidateLocation={selectedCandidateLocation}
         />
       )}
 
@@ -866,6 +878,17 @@ export const App: React.FC = () => {
           }}
           followMe={followMe}
           isLeader={isLeader}
+          availableSearchLocations={availableSearchLocations}
+          onSelectCandidateLocation={(candidate) => {
+            setSelectedCandidateLocation(candidate);
+            if (isJoined && isLeader) {
+              handleSelectLocationForRendezvous(
+                candidate.lat,
+                candidate.lng,
+                `${candidate.icon || '📍'} ${candidate.name}`
+              );
+            }
+          }}
           onLoadError={() => setUseGoogleMaps(false)}
           onRoutesCalculated={(newRoutes) => {
             setRoutes((prev) => {

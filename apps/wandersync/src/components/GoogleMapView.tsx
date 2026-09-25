@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR } from '../types';
+import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR, CandidateSearchLocation, getDeterministicMemberColor } from '../types';
 import { CornerUpLeft, CornerUpRight, Navigation, LocateFixed } from 'lucide-react';
 
 // Pure client-side haversine distance helper
@@ -56,7 +56,7 @@ interface GoogleMapViewProps {
   rendezvous: RendezvousPoint | null;
   tileStyle: MapTileStyle;
   isSettingRendezvous: boolean;
-  onSelectLocationForRendezvous: (lat: number, lng: number) => void;
+  onSelectLocationForRendezvous: (lat: number, lng: number, title?: string) => void;
   selectedMemberId: string | null;
   onSelectMember: (memberId: string | null) => void;
   followMe: boolean;
@@ -76,6 +76,8 @@ interface GoogleMapViewProps {
   onCancelPinningWaypoint?: () => void;
   isPointingPinMode?: boolean;
   onTogglePointingPin?: () => void;
+  availableSearchLocations?: CandidateSearchLocation[];
+  onSelectCandidateLocation?: (candidate: CandidateSearchLocation) => void;
 }
 
 // Obsidian Noir V2V Google Maps Vector Styling (matching user reference image)
@@ -285,6 +287,8 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   onCancelPinningWaypoint,
   isPointingPinMode: controlledPointingPinMode,
   onTogglePointingPin: controlledTogglePointingPin,
+  availableSearchLocations = [],
+  onSelectCandidateLocation,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -294,6 +298,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const infoBoxesRef = useRef<google.maps.OverlayView[]>([]);
   const rendezvousOverlayRef = useRef<google.maps.OverlayView | null>(null);
   const nativeRendezvousMarkerRef = useRef<google.maps.Marker | null>(null);
+  const candidateOverlaysRef = useRef<google.maps.OverlayView[]>([]);
   const waypointOverlaysRef = useRef<google.maps.OverlayView[]>([]);
   const turnOverlayRef = useRef<google.maps.OverlayView | null>(null);
   const [nextManeuver, setNextManeuver] = useState<{
@@ -1014,6 +1019,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     promises.push(
       fetchRealRoute(userOrigin.lat, userOrigin.lng, destination.lat, destination.lng).then((resRoutes) => {
         if (resRoutes && resRoutes.length > 0) {
+          const myDeterministicColor = getDeterministicMemberColor(currentUserId, members);
           resRoutes.forEach((r: any, idx: number) => {
             myCalculatedRoutes.push({
               id: `my-route-${currentUserId}-${idx + 1}`,
@@ -1021,35 +1027,37 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               distanceKm: r.distanceKm,
               durationMins: r.durationMins,
               coordinates: r.coordinates,
-              color: idx === 0 ? (myMember?.color || '#2563eb') : '#60a5fa',
+              color: myDeterministicColor,
               tag: idx === 0 ? 'Fastest for You' : `Alternative ${idx + 1}`,
               forUserId: currentUserId,
-              forUserName: myMember?.name || 'You',
+              forUserName: myMember?.name || (isLeader ? 'You (Admin)' : 'You'),
             });
           });
         }
       })
     );
 
-    // 1B. Squad friends routes to rendezvous (compute only if not already provided by server)
+    // 1B. Squad friends routes to rendezvous (compute all available alternatives with distinct colors)
     friendsWithLoc.forEach((friend) => {
       const existingFriendRoute = (routes || []).find((r) => r.forUserId === friend.id);
       if (!existingFriendRoute) {
         const friendOrigin = { lat: friend.location!.lat, lng: friend.location!.lng };
+        const friendDeterministicColor = getDeterministicMemberColor(friend.id, members);
         promises.push(
           fetchRealRoute(friendOrigin.lat, friendOrigin.lng, destination.lat, destination.lng).then((res) => {
             if (res && res.length > 0) {
-              const primary = res[0];
-              friendCalculatedRoutes.push({
-                id: `friend-route-${friend.id}`,
-                name: primary.name,
-                distanceKm: primary.distanceKm,
-                durationMins: primary.durationMins,
-                coordinates: primary.coordinates,
-                color: friend.color || '#10b981',
-                tag: `${friend.name}'s route`,
-                forUserId: friend.id,
-                forUserName: friend.name,
+              res.forEach((r: any, idx: number) => {
+                friendCalculatedRoutes.push({
+                  id: `friend-route-${friend.id}-${idx + 1}`,
+                  name: r.name,
+                  distanceKm: r.distanceKm,
+                  durationMins: r.durationMins,
+                  coordinates: r.coordinates,
+                  color: friendDeterministicColor,
+                  tag: idx === 0 ? `${friend.name}'s Route` : `${friend.name} Alt ${idx + 1}`,
+                  forUserId: friend.id,
+                  forUserName: friend.name,
+                });
               });
             }
           })
@@ -1124,13 +1132,9 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
     const routesToDraw: RouteRenderItem[] = [];
 
-    // 1. Local Traveler's Chosen Route (Cyan for leader, distinct neon for friend)
+    // 1. Local Traveler's Chosen Route (Deterministic color across all devices)
     if (myChosenRoute && myChosenRoute.coordinates && myChosenRoute.coordinates.length >= 2) {
-      const myPrimaryColor = isLeader
-        ? DRIVER_PRIMARY_COLOR
-        : (myMember?.color && myMember.color !== '#00f0ff' && myMember.color !== '#3b82f6'
-            ? myMember.color
-            : '#ec4899');
+      const myPrimaryColor = getDeterministicMemberColor(currentUserId, members);
 
       routesToDraw.push({
         route: myChosenRoute,
@@ -1159,12 +1163,27 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       });
     }
 
-    // 3. Friends' CHOSEN Routes ONLY (Strictly 1 chosen route per friend, distinct colors)
-    otherFriends.forEach((friend, fIdx) => {
+    // 3. Friends' CHOSEN Routes (Strictly 1 chosen route per friend, distinct deterministic colors)
+    otherFriends.forEach((friend) => {
       const friendRoutes = displayRoutes.filter((r) => r.forUserId === friend.id);
       let friendChosen = friend.assignedRouteId
-        ? friendRoutes.find((r) => r.id === friend.assignedRouteId) || displayRoutes.find((r) => r.id === friend.assignedRouteId) || friendRoutes[0]
-        : friendRoutes[0];
+        ? friendRoutes.find((r) => r.id === friend.assignedRouteId) || displayRoutes.find((r) => r.id === friend.assignedRouteId)
+        : null;
+
+      // Fallback match by index if assignedRouteId is like "...-2" or "...-1"
+      if (!friendChosen && friend.assignedRouteId && friendRoutes.length > 0) {
+        const matchIdx = friend.assignedRouteId.match(/-(\d+)$/);
+        if (matchIdx) {
+          const idx = parseInt(matchIdx[1], 10) - 1;
+          if (friendRoutes[idx]) {
+            friendChosen = friendRoutes[idx];
+          }
+        }
+      }
+
+      if (!friendChosen) {
+        friendChosen = friendRoutes[0];
+      }
 
       // If friend does not yet have a custom route tagged, pick an alternative route from displayRoutes
       if (!friendChosen && displayRoutes.length > 1) {
@@ -1172,11 +1191,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       }
 
       if (friendChosen && friendChosen.coordinates && friendChosen.coordinates.length >= 2) {
-        const friendColor = friend.isLeader
-          ? DRIVER_PRIMARY_COLOR
-          : (friend.color && friend.color !== '#00f0ff' && friend.color !== '#3b82f6'
-              ? friend.color
-              : SQUAD_FRIEND_PALETTE[fIdx % SQUAD_FRIEND_PALETTE.length]);
+        const friendColor = getDeterministicMemberColor(friend.id, members);
 
         routesToDraw.push({
           route: friendChosen,
@@ -1551,6 +1566,139 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       }
     };
   }, [pointedPoint, handleClearPointedRoute]);
+
+  // =========================================================================
+  // RENDER AVAILABLE CANDIDATE SEARCH LOCATIONS ON MAP
+  // =========================================================================
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+
+    // Clean up old candidate overlays
+    candidateOverlaysRef.current.forEach((o) => {
+      try { o.setMap(null); } catch (e) {}
+    });
+    candidateOverlaysRef.current = [];
+
+    if (!availableSearchLocations || availableSearchLocations.length === 0) return;
+
+    class CandidateLocationOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null;
+      private position: google.maps.LatLng;
+      private item: CandidateSearchLocation;
+
+      constructor(item: CandidateSearchLocation) {
+        super();
+        this.item = item;
+        this.position = new google.maps.LatLng(item.lat, item.lng);
+      }
+
+      onAdd() {
+        this.div = document.createElement('div');
+        this.div.style.position = 'absolute';
+        this.div.style.transform = 'translate(-50%, -100%)';
+        this.div.style.cursor = 'pointer';
+        this.div.style.zIndex = '35';
+
+        const isChosen = Boolean(
+          rendezvous &&
+            Math.abs(rendezvous.lat - this.item.lat) < 0.005 &&
+            Math.abs(rendezvous.lng - this.item.lng) < 0.005
+        );
+
+        this.div.innerHTML = `
+          <div class="group flex flex-col items-center select-none transition-transform active:scale-95 hover:scale-105">
+            <div class="relative flex items-center justify-center">
+              <span class="absolute w-9 h-9 rounded-full bg-cyan-400/30 animate-ping"></span>
+              <div class="w-9 h-9 rounded-2xl ${
+                isChosen
+                  ? 'bg-gradient-to-tr from-emerald-500 to-cyan-500 border-emerald-300'
+                  : 'bg-slate-900/95 border-cyan-400/80 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+              } border-2 shadow-2xl flex items-center justify-center text-lg backdrop-blur-md">
+                ${this.item.icon || '📍'}
+              </div>
+            </div>
+            <div class="mt-1 px-2.5 py-1 rounded-full ${
+              isChosen
+                ? 'bg-emerald-950/95 border-emerald-400 text-emerald-300'
+                : 'bg-slate-950/95 border-cyan-500/50 text-cyan-200'
+            } border text-[11px] font-bold whitespace-nowrap shadow-xl flex items-center gap-1.5 backdrop-blur-md">
+              <span>${this.item.name}</span>
+              ${
+                isChosen
+                  ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>'
+                  : '<span class="text-[9px] text-cyan-400/80">Tap to ride</span>'
+              }
+            </div>
+          </div>
+        `;
+
+        this.div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          playPinChime();
+          if (onSelectCandidateLocation) {
+            onSelectCandidateLocation(this.item);
+          } else if (onSelectLocationForRendezvous) {
+            onSelectLocationForRendezvous(
+              this.item.lat,
+              this.item.lng,
+              `${this.item.icon || '📍'} ${this.item.name}`
+            );
+          }
+        });
+
+        const panes = this.getPanes();
+        if (panes && panes.overlayMouseTarget && this.div) {
+          panes.overlayMouseTarget.appendChild(this.div);
+        }
+      }
+
+      draw() {
+        try {
+          if (!this.div) return;
+          const projection = this.getProjection();
+          if (!projection) return;
+          const pos = projection.fromLatLngToDivPixel(this.position);
+          if (pos) {
+            this.div.style.left = `${pos.x}px`;
+            this.div.style.top = `${pos.y}px`;
+          }
+        } catch (e) {}
+      }
+
+      onRemove() {
+        if (this.div?.parentNode) {
+          this.div.parentNode.removeChild(this.div);
+          this.div = null;
+        }
+      }
+    }
+
+    availableSearchLocations.forEach((loc) => {
+      const overlay = new CandidateLocationOverlay(loc);
+      overlay.setMap(mapInstanceRef.current);
+      candidateOverlaysRef.current.push(overlay);
+    });
+
+    // If no active trip yet, fit bounds to show all candidate locations
+    if (!isTripActive && availableSearchLocations.length > 0 && mapInstanceRef.current) {
+      const bounds = new google.maps.LatLngBounds();
+      availableSearchLocations.forEach((loc) => {
+        bounds.extend({ lat: loc.lat, lng: loc.lng });
+      });
+      const myMember = members.find((m) => m.id === currentUserId);
+      if (myMember?.location) {
+        bounds.extend({ lat: myMember.location.lat, lng: myMember.location.lng });
+      }
+      mapInstanceRef.current.fitBounds(bounds, { top: 70, right: 60, bottom: 90, left: 60 });
+    }
+
+    return () => {
+      candidateOverlaysRef.current.forEach((o) => {
+        try { o.setMap(null); } catch (e) {}
+      });
+      candidateOverlaysRef.current = [];
+    };
+  }, [availableSearchLocations, isLoaded, isTripActive, rendezvous, onSelectCandidateLocation, onSelectLocationForRendezvous, members, currentUserId]);
 
   // =========================================================================
   // RENDER CUSTOM REAL-TIME AVATAR OVERLAYS (PERSISTENT & NON-FLICKERING)

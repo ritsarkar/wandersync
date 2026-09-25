@@ -17,7 +17,7 @@ import {
   Navigation,
   Search,
 } from 'lucide-react';
-import { TransportMode } from '../types';
+import { TransportMode, CandidateSearchLocation } from '../types';
 import { GooglePlaceSearchInput } from './GooglePlaceSearchInput';
 
 interface HomepageHeroProps {
@@ -31,6 +31,8 @@ interface HomepageHeroProps {
     initialDestination?: { lat: number; lng: number; title: string };
   }) => void;
   initialTripCode?: string;
+  onUpdateCandidateLocations?: (locations: CandidateSearchLocation[]) => void;
+  selectedCandidateLocation?: CandidateSearchLocation | null;
 }
 
 const VEHICLES: { mode: TransportMode; label: string; icon: string }[] = [
@@ -40,7 +42,7 @@ const VEHICLES: { mode: TransportMode; label: string; icon: string }[] = [
   { mode: 'walk', label: 'Trek / Walk', icon: '🥾' },
 ];
 
-const POPULAR_DESTINATIONS = [
+export const POPULAR_DESTINATIONS = [
   { name: 'Manali, Himachal Pradesh', icon: '🏔️', lat: 32.2432, lng: 77.1892 },
   { name: 'Shimla, Himachal Pradesh', icon: '⛰️', lat: 31.1048, lng: 77.1734 },
   { name: 'Mussoorie, Uttarakhand', icon: '🌲', lat: 30.4598, lng: 78.0644 },
@@ -51,7 +53,12 @@ const POPULAR_DESTINATIONS = [
   { name: 'Ooty, Tamil Nadu', icon: '🏞️', lat: 11.4102, lng: 76.6950 },
 ];
 
-export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripCode }) => {
+export const HomepageHero: React.FC<HomepageHeroProps> = ({
+  onJoin,
+  initialTripCode,
+  onUpdateCandidateLocations,
+  selectedCandidateLocation,
+}) => {
   // Read trip/group query param from URL
   const urlParam =
     new URLSearchParams(window.location.search).get('trip') ||
@@ -74,6 +81,34 @@ export const HomepageHero: React.FC<HomepageHeroProps> = ({ onJoin, initialTripC
     lat: number;
     lng: number;
   } | null>(null);
+
+  // Sync candidate destination clicked directly on background map
+  React.useEffect(() => {
+    if (selectedCandidateLocation) {
+      setSelectedDestination({
+        name: selectedCandidateLocation.name,
+        icon: selectedCandidateLocation.icon || '📍',
+        lat: selectedCandidateLocation.lat,
+        lng: selectedCandidateLocation.lng,
+      });
+    }
+  }, [selectedCandidateLocation]);
+
+  // Initial broadcast of popular locations so pins appear on the map immediately
+  React.useEffect(() => {
+    if (onUpdateCandidateLocations) {
+      const candidates: CandidateSearchLocation[] = POPULAR_DESTINATIONS.map((dest) => ({
+        id: `dest-${dest.name}`,
+        name: dest.name.split(',')[0],
+        lat: dest.lat,
+        lng: dest.lng,
+        icon: dest.icon,
+        formattedAddress: dest.name,
+        type: 'popular',
+      }));
+      onUpdateCandidateLocations(candidates);
+    }
+  }, [onUpdateCandidateLocations]);
 
   // Fields for Joining
   const [joinTripCode, setJoinTripCode] = useState(urlParam || '');

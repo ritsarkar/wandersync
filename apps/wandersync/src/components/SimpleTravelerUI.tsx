@@ -25,7 +25,7 @@ import {
   QrCode,
 } from 'lucide-react';
 import { useFluidSheet } from '../hooks/useFluidSheet';
-import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, WaypointType, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR } from '../types';
+import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, WaypointType, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR, getDeterministicMemberColor } from '../types';
 import { calculateDistanceKm } from '../../server/routingService.js';
 import { GooglePlaceSearchInput } from './GooglePlaceSearchInput';
 
@@ -726,6 +726,7 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
               {(() => {
                 const myRoutes = routes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
                 const otherFriends = members.filter((m) => m.id !== currentUserId);
+                const myColor = getDeterministicMemberColor(currentUserId, members);
 
                 return (
                   <div className="space-y-3">
@@ -733,7 +734,7 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                     <div>
                       <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
                         <span>🛣️ Your Route Options</span>
-                        <span className="text-[10px] text-cyan-400 font-normal">Tap to choose</span>
+                        <span className="text-[10px] font-semibold" style={{ color: myColor }}>Tap to choose</span>
                       </div>
                       <div className="space-y-2">
                         {myRoutes.map((route, idx) => {
@@ -747,23 +748,39 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                               onClick={() => onAssignRoute(currentUserId, route.id)}
                               className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                                 isMyActive
-                                  ? 'bg-cyan-950/40 border-cyan-400 shadow-md shadow-cyan-950/40 text-white'
+                                  ? 'text-white shadow-lg'
                                   : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800 text-slate-300'
                               }`}
+                              style={
+                                isMyActive
+                                  ? {
+                                      borderColor: myColor,
+                                      backgroundColor: `${myColor}20`,
+                                      boxShadow: `0 4px 20px ${myColor}30`,
+                                    }
+                                  : {}
+                              }
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <span
                                   className="w-3 h-3 rounded-full shrink-0"
                                   style={{
-                                    backgroundColor: isMyActive ? '#00f0ff' : '#64748b',
-                                    boxShadow: isMyActive ? '0 0 8px #00f0ff' : 'none',
+                                    backgroundColor: isMyActive ? myColor : '#64748b',
+                                    boxShadow: isMyActive ? `0 0 10px ${myColor}` : 'none',
                                   }}
                                 />
                                 <div className="min-w-0">
                                   <div className="text-xs font-bold truncate flex items-center gap-1.5">
                                     <span>{route.name}</span>
                                     {isMyActive && (
-                                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 font-semibold border border-cyan-400/40 shrink-0">
+                                      <span
+                                        className="text-[9px] px-1.5 py-0.2 rounded font-semibold border shrink-0"
+                                        style={{
+                                          backgroundColor: `${myColor}30`,
+                                          color: myColor,
+                                          borderColor: `${myColor}50`,
+                                        }}
+                                      >
                                         Your Route
                                       </span>
                                     )}
@@ -775,7 +792,10 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                               </div>
 
                               <div className="text-right shrink-0">
-                                <div className={`text-xs font-bold font-mono ${isMyActive ? 'text-cyan-300' : 'text-slate-300'}`}>
+                                <div
+                                  className="text-xs font-bold font-mono"
+                                  style={{ color: isMyActive ? myColor : '#cbd5e1' }}
+                                >
                                   ~{route.durationMins} mins
                                 </div>
                                 <div className="text-[10px] text-slate-400 font-mono">
@@ -796,11 +816,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                           <span className="text-[10px] text-slate-400 font-normal">1 route per friend</span>
                         </div>
                         <div className="space-y-2">
-                          {otherFriends.map((friend, fIdx) => {
-                            const friendColor =
-                              friend.color && friend.color !== '#00f0ff' && friend.color !== '#3b82f6'
-                                ? friend.color
-                                : SQUAD_FRIEND_PALETTE[fIdx % SQUAD_FRIEND_PALETTE.length];
+                          {otherFriends.map((friend) => {
+                            const friendColor = getDeterministicMemberColor(friend.id, members);
 
                             // All routes for this friend
                             const friendRoutes = routes.filter((r) => r.forUserId === friend.id);
@@ -813,14 +830,14 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                               <div
                                 key={friend.id}
                                 className="p-2.5 rounded-2xl bg-slate-800/40 border border-slate-700/60 transition-all space-y-2"
-                                style={{ borderColor: `${friendColor}40` }}
+                                style={{ borderColor: `${friendColor}50` }}
                               >
                                 {/* Header: Friend Avatar, Name, and Chosen Route */}
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2 min-w-0">
                                     <div
                                       className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 border"
-                                      style={{ backgroundColor: `${friendColor}20`, borderColor: friendColor }}
+                                      style={{ backgroundColor: `${friendColor}25`, borderColor: friendColor }}
                                     >
                                       {friend.avatar || '🎒'}
                                     </div>
@@ -857,8 +874,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                   </div>
                                 </div>
 
-                                {/* Alternate Route Selection Pill for this Friend (Admin only) */}
-                                {isLeader && friendRoutes.length > 1 && (
+                                {/* Alternate Route Selection Pill for this Friend */}
+                                {friendRoutes.length > 1 && (
                                   <div className="pt-1.5 border-t border-slate-700/40 flex items-center justify-between gap-2">
                                     <span className="text-[10px] text-slate-400">Select route:</span>
                                     <div className="flex items-center gap-1">
@@ -1351,12 +1368,14 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                   {(() => {
                     const myRoutes = routes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
                     const otherFriends = members.filter((m) => m.id !== currentUserId);
+                    const myColor = getDeterministicMemberColor(currentUserId, members);
 
                     return (
                       <>
                         <div>
                           <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
                             <span>🛣️ My Routes</span>
+                            <span className="text-[10px] font-semibold" style={{ color: myColor }}>Tap to choose</span>
                           </div>
                           <div className="space-y-2">
                             {myRoutes.map((route, idx) => {
@@ -1370,23 +1389,39 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                   onClick={() => onAssignRoute(currentUserId, route.id)}
                                   className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                                     isMyActive
-                                      ? 'bg-cyan-950/40 border-cyan-400 shadow-md shadow-cyan-950/40 text-white'
+                                      ? 'text-white shadow-lg'
                                       : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800 text-slate-300'
                                   }`}
+                                  style={
+                                    isMyActive
+                                      ? {
+                                          borderColor: myColor,
+                                          backgroundColor: `${myColor}20`,
+                                          boxShadow: `0 4px 20px ${myColor}30`,
+                                        }
+                                      : {}
+                                  }
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span
                                       className="w-3 h-3 rounded-full shrink-0"
                                       style={{
-                                        backgroundColor: isMyActive ? '#00f0ff' : '#64748b',
-                                        boxShadow: isMyActive ? '0 0 8px #00f0ff' : 'none',
+                                        backgroundColor: isMyActive ? myColor : '#64748b',
+                                        boxShadow: isMyActive ? `0 0 10px ${myColor}` : 'none',
                                       }}
                                     />
                                     <div className="min-w-0">
                                       <div className="text-xs font-bold truncate flex items-center gap-1.5">
                                         <span>{route.name}</span>
                                         {isMyActive && (
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 font-semibold border border-cyan-400/40 shrink-0">
+                                          <span
+                                            className="text-[9px] px-1.5 py-0.2 rounded font-semibold border shrink-0"
+                                            style={{
+                                              backgroundColor: `${myColor}30`,
+                                              color: myColor,
+                                              borderColor: `${myColor}50`,
+                                            }}
+                                          >
                                             Your Route
                                           </span>
                                         )}
@@ -1399,9 +1434,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
 
                                   <div className="text-right shrink-0">
                                     <div
-                                      className={`text-xs font-bold font-mono ${
-                                        isMyActive ? 'text-cyan-300' : 'text-slate-300'
-                                      }`}
+                                      className="text-xs font-bold font-mono"
+                                      style={{ color: isMyActive ? myColor : '#cbd5e1' }}
                                     >
                                       ~{route.durationMins} mins
                                     </div>
@@ -1420,13 +1454,11 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                           <div className="pt-2 border-t border-slate-800/80">
                             <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
                               <span>👥 Squad ({otherFriends.length})</span>
+                              <span className="text-[10px] text-slate-400 font-normal">1 route per friend</span>
                             </div>
                             <div className="space-y-2">
-                              {otherFriends.map((friend, fIdx) => {
-                                const friendColor =
-                                  friend.color && friend.color !== '#00f0ff' && friend.color !== '#3b82f6'
-                                    ? friend.color
-                                    : SQUAD_FRIEND_PALETTE[fIdx % SQUAD_FRIEND_PALETTE.length];
+                              {otherFriends.map((friend) => {
+                                const friendColor = getDeterministicMemberColor(friend.id, members);
 
                                 const friendRoutes = routes.filter((r) => r.forUserId === friend.id);
                                 const chosenRoute = friend.assignedRouteId
@@ -1439,14 +1471,14 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                   <div
                                     key={friend.id}
                                     className="p-2.5 rounded-2xl bg-slate-800/40 border border-slate-700/60 transition-all space-y-2"
-                                    style={{ borderColor: `${friendColor}40` }}
+                                    style={{ borderColor: `${friendColor}50` }}
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="flex items-center gap-2 min-w-0">
                                         <div
                                           className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 border"
                                           style={{
-                                            backgroundColor: `${friendColor}20`,
+                                            backgroundColor: `${friendColor}25`,
                                             borderColor: friendColor,
                                           }}
                                         >
@@ -1491,8 +1523,8 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Alternate Route Switcher Pills (Admin only) */}
-                                    {isLeader && friendRoutes.length > 1 && (
+                                    {/* Alternate Route Switcher Pills */}
+                                    {friendRoutes.length > 1 && (
                                       <div className="pt-1.5 border-t border-slate-700/40 flex items-center justify-between gap-2">
                                         <span className="text-[10px] text-slate-400">Select route:</span>
                                         <div className="flex items-center gap-1">

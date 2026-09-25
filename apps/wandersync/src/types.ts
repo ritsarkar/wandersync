@@ -93,8 +93,38 @@ export interface TripCountdownEvent {
   timestamp: number;
 }
 
+export interface CandidateSearchLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  icon?: string;
+  formattedAddress?: string;
+  type?: 'popular' | 'search_result';
+}
+
 export const SQUAD_FRIEND_PALETTE = ['#ec4899', '#f59e0b', '#8b5cf6', '#10b981', '#f97316', '#3b82f6'];
 export const DRIVER_PRIMARY_COLOR = '#00f0ff';
+
+export function getDeterministicMemberColor(
+  memberId: string | null | undefined,
+  members: { id: string; color?: string; isLeader?: boolean }[]
+): string {
+  if (!memberId) return DRIVER_PRIMARY_COLOR;
+  const member = members.find((m) => m.id === memberId);
+  if (member?.isLeader) return DRIVER_PRIMARY_COLOR;
+
+  // Filter non-leaders for consistent palette distribution across all devices
+  const nonLeaders = members.filter((m) => !m.isLeader);
+  const idx = nonLeaders.findIndex((m) => m.id === memberId);
+  if (idx >= 0) {
+    return SQUAD_FRIEND_PALETTE[idx % SQUAD_FRIEND_PALETTE.length];
+  }
+  if (member?.color && member.color !== '#00f0ff' && member.color !== '#3b82f6') {
+    return member.color;
+  }
+  return SQUAD_FRIEND_PALETTE[0];
+}
 
 export function getMemberRouteColor(
   member: { id: string; color?: string; isLeader?: boolean } | null | undefined,
@@ -107,3 +137,4 @@ export function getMemberRouteColor(
   }
   return SQUAD_FRIEND_PALETTE[Math.max(0, friendIndex) % SQUAD_FRIEND_PALETTE.length];
 }
+
