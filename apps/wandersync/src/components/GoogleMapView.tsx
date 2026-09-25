@@ -1984,7 +1984,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
       {/* Top Google Maps Turn-by-Turn Guidance HUD */}
       {isTripActive && !isCornerMapSwapped && nextManeuver && (
-        <div className="absolute top-4 left-3 right-auto z-40 max-w-sm pointer-events-auto animate-fade-in">
+        <div className="absolute top-18 left-3 sm:top-20 sm:left-4 right-auto z-40 max-w-sm pointer-events-auto animate-fade-in">
           <div className="bg-emerald-600/95 backdrop-blur-xl border border-emerald-400/60 rounded-3xl p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.7)] text-white flex items-center gap-3.5">
             {/* Big Turn Maneuver Icon */}
             <div className="w-12 h-12 rounded-2xl bg-emerald-700 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg">

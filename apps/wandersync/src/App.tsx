@@ -9,6 +9,8 @@ import { LocationPermissionModal } from './components/LocationPermissionModal';
 import { V2VCockpitHUD } from './components/V2VCockpitHUD';
 import { ConvoyCountdownModal } from './components/ConvoyCountdownModal';
 import { CornerJourneyRouteMap } from './components/CornerJourneyRouteMap';
+import { AddFriendModal } from './components/AddFriendModal';
+import { UserPlus } from 'lucide-react';
 import { calculateDistanceKm } from '../server/routingService.js';
 import {
   GroupMessage,
@@ -90,6 +92,8 @@ export const App: React.FC = () => {
   const [activeCountdown, setActiveCountdown] = useState<TripCountdownEvent | null>(null);
   // Swap between zoomed driver map and full journey overview in corner
   const [isCornerMapSwapped, setIsCornerMapSwapped] = useState(false);
+  // Add Friend / Invite Modal during live traveling
+  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
 
   // Map Tile Style (Default: Google Terrain / Mountains)
   const [tileStyle, setTileStyle] = useState<MapTileStyle>('terrain');
@@ -934,6 +938,7 @@ export const App: React.FC = () => {
           onToggleSimulation={handleToggleSimulation}
           isPointingPinMode={isPointingPinMode}
           onTogglePointingPin={() => setIsPointingPinMode((prev) => !prev)}
+          onOpenAddFriend={() => setShowAddFriendModal(true)}
           onAddHazard={(type, label) => {
             const myPos = realLocation || members.find((m) => m.id === currentUserId)?.location;
             if (myPos) {
@@ -979,6 +984,30 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Small Floating "Add Friend" Icon on Map during Live Traveling */}
+      {isJoined && isTripActive && (
+        <div className="fixed top-4 left-4 z-40 pointer-events-auto select-none animate-fade-in">
+          <button
+            type="button"
+            onClick={() => setShowAddFriendModal(true)}
+            className="apple-pressable p-2.5 sm:px-3.5 sm:py-2.5 rounded-2xl apple-glass-pill bg-slate-900/85 hover:bg-slate-800 text-white border border-emerald-500/40 hover:border-emerald-400 shadow-[0_8px_30px_rgba(0,0,0,0.6)] flex items-center gap-2 cursor-pointer transition active:scale-95 group ring-2 ring-emerald-500/20"
+            title="Add Friend to Convoy (Invite Link & QR Code)"
+          >
+            <div className="relative flex items-center justify-center">
+              <UserPlus className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500" />
+            </div>
+            <span className="font-extrabold text-xs tracking-tight text-white hidden xs:inline sm:inline">
+              Add Friend
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+              {members.length}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Emergency Alert Banner */}
       <SOSBanner
         activeSOS={activeSOS}
@@ -988,6 +1017,14 @@ export const App: React.FC = () => {
           );
         }}
         onDismiss={() => setActiveSOS(null)}
+      />
+
+      {/* Add Friend / Squad Invite Modal */}
+      <AddFriendModal
+        isOpen={showAddFriendModal}
+        onClose={() => setShowAddFriendModal(false)}
+        groupId={groupId}
+        members={members}
       />
 
     </div>

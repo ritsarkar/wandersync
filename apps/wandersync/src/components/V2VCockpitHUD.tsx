@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { TravelerMember, RendezvousPoint, TravelRoute, Waypoint } from '../types';
-import { Compass, X, Play, Square } from 'lucide-react';
+import { Compass, X, Play, Square, UserPlus } from 'lucide-react';
 
 // Pure client-side haversine distance helper
 function calcDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -58,6 +58,7 @@ interface V2VCockpitHUDProps {
   onAddHazard?: (type: string, label: string) => void;
   isPointingPinMode?: boolean;
   onTogglePointingPin?: () => void;
+  onOpenAddFriend?: () => void;
 }
 
 export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
@@ -74,6 +75,7 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
   onAddHazard,
   isPointingPinMode = false,
   onTogglePointingPin,
+  onOpenAddFriend,
 }) => {
   const [reportToast, setReportToast] = React.useState<string | null>(null);
   const me = members.find((m) => m.id === currentUserId);
@@ -308,6 +310,19 @@ export const V2VCockpitHUD: React.FC<V2VCockpitHUDProps> = ({
 
           {/* Bottom Right: Cockpit Navigation Controls */}
           <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Small Add Friend Icon Button on HUD */}
+            {onOpenAddFriend && (
+              <button
+                type="button"
+                onClick={onOpenAddFriend}
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl apple-glass-pill bg-emerald-950/40 hover:bg-emerald-900/60 text-[#34C759] border border-emerald-500/40 font-bold text-[11px] sm:text-xs flex items-center gap-1.5 apple-pressable cursor-pointer shadow-lg shadow-black/40 transition active:scale-95"
+                title="Add Friend to Convoy (Invite Link & QR)"
+              >
+                <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#34C759]" />
+                <span className="font-bold hidden sm:inline">Add Friend</span>
+              </button>
+            )}
+
             {/* Demo Drive Simulation Toggle */}
             {onToggleSimulation && (
               <button
