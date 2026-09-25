@@ -1162,9 +1162,14 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     // 3. Friends' CHOSEN Routes ONLY (Strictly 1 chosen route per friend, distinct colors)
     otherFriends.forEach((friend, fIdx) => {
       const friendRoutes = displayRoutes.filter((r) => r.forUserId === friend.id);
-      const friendChosen = friend.assignedRouteId
+      let friendChosen = friend.assignedRouteId
         ? friendRoutes.find((r) => r.id === friend.assignedRouteId) || displayRoutes.find((r) => r.id === friend.assignedRouteId) || friendRoutes[0]
         : friendRoutes[0];
+
+      // If friend does not yet have a custom route tagged, pick an alternative route from displayRoutes
+      if (!friendChosen && displayRoutes.length > 1) {
+        friendChosen = displayRoutes.find((r) => r.id !== myChosenRoute?.id) || displayRoutes[1];
+      }
 
       if (friendChosen && friendChosen.coordinates && friendChosen.coordinates.length >= 2) {
         const friendColor = friend.isLeader

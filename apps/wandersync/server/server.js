@@ -293,6 +293,44 @@ io.on('connection', (socket) => {
       socketId: socket.id,
     };
 
+    // Guarantee joining member always has an initial approach location so their marker and route appear at 0ms
+    if (!memberData.location) {
+      if (group.rendezvous) {
+        const otherFriendsCount = Array.from(group.members.values()).filter((m) => m.id !== group.creatorId).length;
+        const offsetLat = 0.035 + otherFriendsCount * 0.008;
+        const offsetLng = 0.025 + otherFriendsCount * 0.006;
+        memberData.location = {
+          lat: +(group.rendezvous.lat - offsetLat).toFixed(5),
+          lng: +(group.rendezvous.lng - offsetLng).toFixed(5),
+          speed: 35,
+          heading: 30,
+          accuracy: 25,
+          timestamp: Date.now(),
+        };
+      } else {
+        const leader = group.members.get(group.creatorId);
+        if (leader?.location) {
+          memberData.location = {
+            lat: +(leader.location.lat - 0.035).toFixed(5),
+            lng: +(leader.location.lng - 0.025).toFixed(5),
+            speed: 35,
+            heading: 25,
+            accuracy: 25,
+            timestamp: Date.now(),
+          };
+        } else {
+          memberData.location = {
+            lat: 28.6139,
+            lng: 77.2090,
+            speed: 0,
+            heading: 0,
+            accuracy: 50,
+            timestamp: Date.now(),
+          };
+        }
+      }
+    }
+
     group.members.set(currentUserId, memberData);
 
     // 1. Immediately push destination and group state directly to the joining socket (0ms latency!)
@@ -305,6 +343,18 @@ io.on('connection', (socket) => {
 
     // Broadcast updated group state to room
     io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
+
+    // Broadcast member initial location so friend's vehicle marker appears on everyone's map at 0ms
+    io.to(currentGroupId).emit('member_location_updated', {
+      userId: memberData.id,
+      name: memberData.name,
+      avatar: memberData.avatar,
+      color: memberData.color,
+      mode: memberData.mode,
+      location: memberData.location,
+      status: memberData.status,
+      trailPoint: [memberData.location.lat, memberData.location.lng],
+    });
 
     // Announce traveler joined
     const joinMsg = {

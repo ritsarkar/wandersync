@@ -182,12 +182,45 @@ export const App: React.FC = () => {
     });
 
     const unsubRendezvous = socketService.onRendezvousUpdated((data) => {
-      if (data.rendezvous) setRendezvous(data.rendezvous);
-      if (data.routes && data.routes.length > 0) setRoutes(data.routes);
+      if (data.rendezvous) {
+        setRendezvous(data.rendezvous);
+        // If current user is waiting for GPS and still locating, place near approach road so vehicle & route appear immediately
+        setMembers((prev) => {
+          const myIdx = prev.findIndex((m) => m.id === currentUserId);
+          if (myIdx >= 0 && (!realLocation || prev[myIdx].status === 'locating')) {
+            const copy = [...prev];
+            const approachLoc: LocationData = {
+              lat: +(data.rendezvous.lat - 0.035).toFixed(5),
+              lng: +(data.rendezvous.lng - 0.025).toFixed(5),
+              speed: 35,
+              heading: 25,
+              accuracy: 20,
+              timestamp: Date.now(),
+            };
+            copy[myIdx] = { ...copy[myIdx], location: approachLoc, status: 'active' };
+            socketService.updateLocation(groupId, currentUserId, approachLoc);
+            return copy;
+          }
+          return prev;
+        });
+      }
+      if (data.routes && data.routes.length > 0) {
+        setRoutes((prev) => {
+          const incomingIds = new Set(data.routes.filter((r) => r.forUserId).map((r) => r.forUserId));
+          const others = prev.filter((r) => r.forUserId && !incomingIds.has(r.forUserId));
+          return [...others, ...data.routes];
+        });
+      }
     });
 
     const unsubRoutes = socketService.onRoutesUpdated((newRoutes) => {
-      setRoutes(newRoutes);
+      if (Array.isArray(newRoutes) && newRoutes.length > 0) {
+        setRoutes((prev) => {
+          const incomingIds = new Set(newRoutes.filter((r) => r.forUserId).map((r) => r.forUserId));
+          const others = prev.filter((r) => r.forUserId && !incomingIds.has(r.forUserId));
+          return [...others, ...newRoutes];
+        });
+      }
     });
 
     const unsubMemberRoute = socketService.onMemberRouteUpdated(({ userId, routeId }) => {
@@ -512,18 +545,37 @@ export const App: React.FC = () => {
       localStorage.setItem('wandersync_user_mode', data.mode);
     } catch (e) {}
 
-    // Register user immediately in group with real location if already fetched, or a smart starting approach
+    // Guarantee user immediately in group with real location if already fetched, or a smart starting approach
     let initialLoc = realLocation;
-    if (!initialLoc && !data.isCreator) {
+    if (!initialLoc) {
+      const targetRendezvous = data.initialDestination || rendezvous;
       const leaderMember = members.find((m) => m.isLeader && m.location);
-      if (leaderMember?.location) {
-        // Position friend near leader on approach road so friend vehicle & route appear immediately
+      if (targetRendezvous) {
+        // Position on approach road ~3.5km from destination so vehicle & route appear immediately
+        initialLoc = {
+          lat: +(targetRendezvous.lat - (data.isCreator ? 0.045 : 0.035)).toFixed(5),
+          lng: +(targetRendezvous.lng - (data.isCreator ? 0.035 : 0.025)).toFixed(5),
+          speed: 38,
+          heading: 25,
+          accuracy: 15,
+          timestamp: Date.now(),
+        };
+      } else if (leaderMember?.location) {
         initialLoc = {
           lat: +(leaderMember.location.lat - 0.035).toFixed(5),
           lng: +(leaderMember.location.lng - 0.025).toFixed(5),
           speed: 38,
           heading: 20,
           accuracy: 15,
+          timestamp: Date.now(),
+        };
+      } else {
+        initialLoc = {
+          lat: 28.6139,
+          lng: 77.2090,
+          speed: 0,
+          heading: 0,
+          accuracy: 50,
           timestamp: Date.now(),
         };
       }
@@ -534,7 +586,7 @@ export const App: React.FC = () => {
       isLeader: Boolean(data.isCreator),
       location: initialLoc || undefined,
       trail: initialLoc ? [[initialLoc.lat, initialLoc.lng]] : [],
-      status: initialLoc ? 'active' : 'locating',
+      status: realLocation ? 'active' : 'locating',
       lastSeen: Date.now(),
     };
     setMembers((prev) => [initialMember, ...prev.filter((m) => m.id !== currentUserId)]);
