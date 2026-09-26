@@ -89,7 +89,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-[28px] bg-slate-900/95 border border-slate-700/80 shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-5 text-white flex flex-col items-center"
+        className="relative w-full max-w-sm rounded-[28px] bg-slate-900/95 border border-slate-700/80 shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-5 text-white flex flex-col items-center animate-modal-enter"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}

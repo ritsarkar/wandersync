@@ -2331,7 +2331,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
       {/* 3. Toast Notification (Minimal Glass Pill) */}
       {pinnedConfirmationToast && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-fade-in">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-toast-enter">
           <div className="px-4 py-1.5 rounded-full apple-glass-pill border border-white/20 text-white font-bold text-xs shadow-2xl flex items-center gap-2">
             <span>{pinnedConfirmationToast}</span>
           </div>

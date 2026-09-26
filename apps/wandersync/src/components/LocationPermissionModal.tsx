@@ -23,7 +23,7 @@ export const LocationPermissionModal: React.FC<LocationPermissionModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700/80 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-slate-100 flex flex-col items-center text-center">
+      <div className="bg-slate-900 border border-slate-700/80 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-slate-100 flex flex-col items-center text-center animate-modal-enter">
         
         {/* Close / Dismiss button */}
         <button

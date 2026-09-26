@@ -95,7 +95,7 @@ export const ConvoyCountdownModal: React.FC<ConvoyCountdownModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-[280px] sm:max-w-xs apple-glass-card rounded-[32px] p-6 text-white flex flex-col items-center justify-center shadow-2xl border border-white/20">
+      <div className="relative w-full max-w-[280px] sm:max-w-xs apple-glass-card rounded-[32px] p-6 text-white flex flex-col items-center justify-center shadow-2xl border border-white/20 animate-modal-enter">
         
         {/* Subtle Cancel Button */}
         {onCancel && (
