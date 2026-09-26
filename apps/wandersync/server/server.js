@@ -182,6 +182,52 @@ app.get('/api/places/autocomplete', async (req, res) => {
   res.json({ suggestions: [] });
 });
 
+// Geo-IP Location Resolver: Detects user's real regional location (e.g. West Bengal) from Vercel edge headers or IP lookup
+app.get('/api/my-location', async (req, res) => {
+  try {
+    // 1. Check Vercel Edge Geolocation Headers (Zero-latency real region)
+    const vLat = parseFloat(req.headers['x-vercel-ip-latitude']);
+    const vLng = parseFloat(req.headers['x-vercel-ip-longitude']);
+    const city = req.headers['x-vercel-ip-city'];
+    const region = req.headers['x-vercel-ip-country-region'];
+    const country = req.headers['x-vercel-ip-country'];
+
+    if (!isNaN(vLat) && !isNaN(vLng) && isValidCoordinate(vLat, vLng)) {
+      return res.json({
+        lat: vLat,
+        lng: vLng,
+        city: city ? decodeURIComponent(city) : undefined,
+        region: region || undefined,
+        country: country || undefined,
+        source: 'vercel_edge'
+      });
+    }
+
+    // 2. Fallback to client IP lookup if local or headers absent
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+    if (clientIp && !clientIp.startsWith('127.') && !clientIp.startsWith('192.168.') && clientIp !== '::1') {
+      const ipRes = await fetch(`https://ipapi.co/${clientIp}/json/`, { signal: AbortSignal.timeout(3000) });
+      if (ipRes.ok) {
+        const ipData = await ipRes.json();
+        if (ipData.latitude && ipData.longitude && isValidCoordinate(ipData.latitude, ipData.longitude)) {
+          return res.json({
+            lat: Number(ipData.latitude),
+            lng: Number(ipData.longitude),
+            city: ipData.city,
+            region: ipData.region,
+            country: ipData.country_code,
+            source: 'ip_lookup'
+          });
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return res.json({ lat: null, lng: null, source: 'none' });
+});
+
 // Google Place Details (Coordinates) Endpoint
 app.get('/api/places/details', async (req, res) => {
   const { placeId } = req.query;
@@ -274,11 +320,48 @@ io.on('connection', (socket) => {
 
     socket.join(currentGroupId);
 
-    // Register or update member
-    const existingMember = group.members.get(currentUserId);
+    // === UNIQUE NAME & IDENTITY RE-ENROLLMENT DEDUPLICATION ===
+    const cleanName = safeName.trim().toLowerCase();
+    let existingMember = group.members.get(currentUserId);
+    let matchedOldId = null;
+
+    if (!existingMember) {
+      for (const [mId, m] of group.members.entries()) {
+        if (m.name && m.name.trim().toLowerCase() === cleanName) {
+          existingMember = m;
+          matchedOldId = mId;
+          break;
+        }
+      }
+    }
+
+    // If member is re-enrolling from same name but a different/new socket ID:
+    if (matchedOldId && matchedOldId !== currentUserId) {
+      console.log(`[Deduplication] Merging rejoining member "${safeName}": old ID ${matchedOldId} -> new ID ${currentUserId}`);
+      // Re-assign routes from old ID to new currentUserId
+      if (group.routes) {
+        group.routes.forEach((r) => {
+          if (r.forUserId === matchedOldId) {
+            r.forUserId = currentUserId;
+            r.forUserName = safeName;
+          }
+        });
+      }
+      group.members.delete(matchedOldId);
+      io.to(currentGroupId).emit('member_left', { userId: matchedOldId, replacedBy: currentUserId });
+    }
+
+    // Clean up any lingering ghost members with the same normalized name
+    for (const [mId, m] of group.members.entries()) {
+      if (mId !== currentUserId && m.name && m.name.trim().toLowerCase() === cleanName) {
+        group.members.delete(mId);
+        io.to(currentGroupId).emit('member_left', { userId: mId, replacedBy: currentUserId });
+      }
+    }
+
     const hasInitialLoc = Boolean(
       (profile?.location && isValidCoordinate(profile.location.lat, profile.location.lng)) || 
-      existingMember?.location
+      (existingMember?.location && isValidCoordinate(existingMember.location.lat, existingMember.location.lng))
     );
     const isLeader = group.creatorId === currentUserId;
 
@@ -295,6 +378,10 @@ io.on('connection', (socket) => {
       }
     }
 
+    const initialLocation = hasInitialLoc
+      ? (profile?.location && isValidCoordinate(profile.location.lat, profile.location.lng) ? profile.location : existingMember.location)
+      : null;
+
     const memberData = {
       id: currentUserId,
       name: safeName,
@@ -303,51 +390,13 @@ io.on('connection', (socket) => {
       mode: safeMode,
       isLeader: isLeader,
       assignedRouteId: profile?.assignedRouteId || (existingMember ? existingMember.assignedRouteId : null),
-      location: (profile?.location && isValidCoordinate(profile.location.lat, profile.location.lng)) ? profile.location : existingMember?.location || null,
-      trail: existingMember?.trail || [],
+      location: initialLocation,
+      trail: existingMember?.trail || (initialLocation ? [[initialLocation.lat, initialLocation.lng]] : []),
       isSimulated: Boolean(profile?.isSimulated),
       status: hasInitialLoc ? 'active' : 'locating',
       lastSeen: Date.now(),
       socketId: socket.id,
     };
-
-    // Guarantee joining member always has an initial approach location so their marker and route appear at 0ms
-    if (!memberData.location) {
-      if (group.rendezvous) {
-        const otherFriendsCount = Array.from(group.members.values()).filter((m) => m.id !== group.creatorId).length;
-        const offsetLat = 0.035 + otherFriendsCount * 0.008;
-        const offsetLng = 0.025 + otherFriendsCount * 0.006;
-        memberData.location = {
-          lat: +(group.rendezvous.lat - offsetLat).toFixed(5),
-          lng: +(group.rendezvous.lng - offsetLng).toFixed(5),
-          speed: 35,
-          heading: 30,
-          accuracy: 25,
-          timestamp: Date.now(),
-        };
-      } else {
-        const leader = group.members.get(group.creatorId);
-        if (leader?.location) {
-          memberData.location = {
-            lat: +(leader.location.lat - 0.035).toFixed(5),
-            lng: +(leader.location.lng - 0.025).toFixed(5),
-            speed: 35,
-            heading: 25,
-            accuracy: 25,
-            timestamp: Date.now(),
-          };
-        } else {
-          memberData.location = {
-            lat: 28.6139,
-            lng: 77.2090,
-            speed: 0,
-            heading: 0,
-            accuracy: 50,
-            timestamp: Date.now(),
-          };
-        }
-      }
-    }
 
     group.members.set(currentUserId, memberData);
 
@@ -359,17 +408,19 @@ io.on('connection', (socket) => {
       });
     }
 
-    // Broadcast member initial location so friend's vehicle marker appears on everyone's map at 0ms
-    io.to(currentGroupId).emit('member_location_updated', {
-      userId: memberData.id,
-      name: memberData.name,
-      avatar: memberData.avatar,
-      color: memberData.color,
-      mode: memberData.mode,
-      location: memberData.location,
-      status: memberData.status,
-      trailPoint: [memberData.location.lat, memberData.location.lng],
-    });
+    // Broadcast member initial location only if valid real coordinates are known
+    if (memberData.location) {
+      io.to(currentGroupId).emit('member_location_updated', {
+        userId: memberData.id,
+        name: memberData.name,
+        avatar: memberData.avatar,
+        color: memberData.color,
+        mode: memberData.mode,
+        location: memberData.location,
+        status: memberData.status,
+        trailPoint: [memberData.location.lat, memberData.location.lng],
+      });
+    }
 
     // Announce traveler joined
     const joinMsg = {
@@ -427,6 +478,25 @@ io.on('connection', (socket) => {
           console.warn('[Routes] Could not compute route for joining member:', err.message);
         });
     }
+  });
+
+  // Member Departure / Leave Group Handler
+  socket.on('leave_group', ({ groupId, userId }) => {
+    const targetGroupId = groupId || currentGroupId;
+    const targetUserId = userId || currentUserId;
+    if (!targetGroupId || !targetUserId) return;
+
+    const group = groups.get(targetGroupId);
+    if (group) {
+      group.members.delete(targetUserId);
+      if (group.routes) {
+        group.routes = group.routes.filter((r) => r.forUserId !== targetUserId);
+      }
+      io.to(targetGroupId).emit('member_left', { userId: targetUserId });
+      io.to(targetGroupId).emit('group_state_updated', serializeGroup(group));
+      scheduleSaveGroups(groups);
+    }
+    socket.leave(targetGroupId);
   });
 
   // 2. High-Frequency Real-Time Location Update

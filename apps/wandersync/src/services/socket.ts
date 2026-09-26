@@ -45,6 +45,7 @@ class SocketService {
   private countdownStartedListeners: Set<(event: TripCountdownEvent) => void> = new Set();
   private countdownCancelledListeners: Set<(data: { cancelledBy: string }) => void> = new Set();
   private tripActiveListeners: Set<(data: { isTripActive: boolean }) => void> = new Set();
+  private memberLeftListeners: Set<(data: { userId: string; replacedBy?: string }) => void> = new Set();
 
   connect(): Socket {
     if (!this.socket) {
@@ -72,6 +73,7 @@ class SocketService {
       // Wire Socket.IO incoming events into unified listeners
       this.socket.on('group_state_updated', (group) => this.dispatchGroupState(group));
       this.socket.on('member_location_updated', (data) => this.dispatchLocation(data));
+      this.socket.on('member_left', (data) => this.dispatchMemberLeft(data));
       this.socket.on('new_message', (msg) => this.dispatchMessage(msg));
       this.socket.on('sos_triggered', (sosMsg) => this.dispatchSOS(sosMsg));
       this.socket.on('rendezvous_updated', (data) => this.dispatchRendezvous(data));
@@ -321,12 +323,24 @@ class SocketService {
           this.dispatchWaypointRemoved({ waypointId: data.waypointId });
         }
         break;
+
+      case 'member_left':
+        if (data.userId) {
+          this.dispatchMemberLeft({ userId: data.userId, replacedBy: data.replacedBy });
+        }
+        break;
     }
   }
 
   // =========================================================================
   // UNIFIED DISPATCHERS (Pass events to local subscribers)
   // =========================================================================
+  private dispatchMemberLeft(data: { userId: string; replacedBy?: string }) {
+    this.memberLeftListeners.forEach((cb) => {
+      try { cb(data); } catch (e) { console.error(e); }
+    });
+  }
+
   private dispatchGroupState(group: TravelGroup) {
     this.groupStateListeners.forEach((cb) => {
       try { cb(group); } catch (e) { console.error(e); }
@@ -441,13 +455,23 @@ class SocketService {
 
   leaveGroup() {
     if (this.savedGroupId && this.savedProfile?.id) {
-      this.publishMqtt(`presence/${this.savedProfile.id}`, {
-        event: 'member_status_updated',
-        userId: this.savedProfile.id,
-        status: 'offline',
+      const uId = this.savedProfile.id;
+      const gId = this.savedGroupId;
+      // 1. Notify Socket.IO server so it deletes the member and recalculates
+      if (this.socket && this.socket.connected) {
+        this.socket.emit('leave_group', { groupId: gId, userId: uId });
+      }
+      // 2. Clear retained presence in MQTT broker so ghosts don't resurrect
+      this.publishMqtt(`presence/${uId}`, {
+        event: 'member_left',
+        userId: uId,
+      }, true);
+      this.publishMqtt('events', {
+        event: 'member_left',
+        userId: uId,
       });
       if (this.mqttClient && this.mqttClient.connected) {
-        const channel = getSecureMqttChannel(this.savedGroupId);
+        const channel = getSecureMqttChannel(gId);
         this.mqttClient.unsubscribe(`wandersync/v2/c/${channel}/#`);
       }
     }
@@ -666,6 +690,11 @@ class SocketService {
   onTripActiveUpdated(callback: (data: { isTripActive: boolean }) => void) {
     this.tripActiveListeners.add(callback);
     return () => this.tripActiveListeners.delete(callback);
+  }
+
+  onMemberLeft(callback: (data: { userId: string; replacedBy?: string }) => void) {
+    this.memberLeftListeners.add(callback);
+    return () => this.memberLeftListeners.delete(callback);
   }
 }
 

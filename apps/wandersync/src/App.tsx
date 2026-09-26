@@ -45,18 +45,57 @@ export const App: React.FC = () => {
   const [selectedCandidateLocation, setSelectedCandidateLocation] = useState<CandidateSearchLocation | null>(null);
   const [currentUserId] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('wandersync_user_id') || localStorage.getItem('wandersync_user_id');
+      const saved = localStorage.getItem('wandersync_user_id') || sessionStorage.getItem('wandersync_user_id');
       if (saved) {
+        localStorage.setItem('wandersync_user_id', saved);
         sessionStorage.setItem('wandersync_user_id', saved);
         return saved;
       }
-      const newId = `usr-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 4)}`;
+      const newId = `usr-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+      localStorage.setItem('wandersync_user_id', newId);
       sessionStorage.setItem('wandersync_user_id', newId);
       return newId;
     } catch (e) {
-      return `usr-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 4)}`;
+      return `usr-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
     }
   });
+
+  // Strict User Deduplication: Guarantees 1 record per unique traveler / name
+  const deduplicateMembers = (membersList: TravelerMember[], myId: string): TravelerMember[] => {
+    const byId = new Map<string, TravelerMember>();
+    const byName = new Map<string, TravelerMember>();
+
+    for (const m of membersList) {
+      if (!m || !m.name) continue;
+      const cleanName = m.name.trim().toLowerCase();
+
+      // If current user, always preserve my own identity
+      if (m.id === myId) {
+        byId.set(m.id, m);
+        byName.set(cleanName, m);
+        continue;
+      }
+
+      const existing = byName.get(cleanName);
+      if (existing) {
+        // If incoming member is active/moving and old is offline, replace old duplicate
+        if ((m.status === 'active' || m.status === 'moving') && existing.status === 'offline') {
+          byId.delete(existing.id);
+          byId.set(m.id, m);
+          byName.set(cleanName, m);
+        } else if ((m.lastSeen || 0) >= (existing.lastSeen || 0)) {
+          byId.delete(existing.id);
+          byId.set(m.id, m);
+          byName.set(cleanName, m);
+        }
+      } else {
+        byId.set(m.id, m);
+        byName.set(cleanName, m);
+      }
+    }
+
+    return Array.from(byId.values());
+  };
 
   const [userProfile, setUserProfile] = useState<{
     id: string;
@@ -132,7 +171,7 @@ export const App: React.FC = () => {
 
     // Group state from server (ONLY contains real members who joined this room code)
     const unsubGroupState = socketService.onGroupState((group: TravelGroup) => {
-      setMembers(group.members);
+      setMembers(deduplicateMembers(group.members, currentUserId));
       if (group.routes && group.routes.length > 0) {
         setRoutes((prev) => {
           // Only accept if incoming has at least as many user routes as we already have
@@ -165,6 +204,7 @@ export const App: React.FC = () => {
     const unsubLocation = socketService.onMemberLocation((data) => {
       setMembers((prev) => {
         const exists = prev.some((m) => m.id === data.userId);
+        let updatedList: TravelerMember[];
         if (!exists) {
           const newMember: TravelerMember = {
             id: data.userId,
@@ -174,30 +214,38 @@ export const App: React.FC = () => {
             mode: (data.mode as any) || 'car',
             location: data.location,
             status: (data.status as any) || 'active',
-            trail: [data.trailPoint],
+            trail: data.trailPoint ? [data.trailPoint] : [],
             lastSeen: Date.now(),
           };
-          return [...prev, newMember];
+          updatedList = [...prev, newMember];
+        } else {
+          updatedList = prev.map((m) => {
+            if (m.id === data.userId) {
+              const updatedTrail = m.trail ? [...m.trail, data.trailPoint] : [data.trailPoint];
+              if (updatedTrail.length > 60) updatedTrail.shift();
+              return {
+                ...m,
+                name: data.name || m.name,
+                avatar: data.avatar || m.avatar,
+                color: data.color || m.color,
+                mode: (data.mode as any) || m.mode,
+                location: data.location,
+                status: (data.status as any) || m.status,
+                trail: updatedTrail,
+                lastSeen: Date.now(),
+              };
+            }
+            return m;
+          });
         }
-        return prev.map((m) => {
-          if (m.id === data.userId) {
-            const updatedTrail = m.trail ? [...m.trail, data.trailPoint] : [data.trailPoint];
-            if (updatedTrail.length > 60) updatedTrail.shift();
-            return {
-              ...m,
-              name: data.name || m.name,
-              avatar: data.avatar || m.avatar,
-              color: data.color || m.color,
-              mode: (data.mode as any) || m.mode,
-              location: data.location,
-              status: (data.status as any) || m.status,
-              trail: updatedTrail,
-              lastSeen: Date.now(),
-            };
-          }
-          return m;
-        });
+        return deduplicateMembers(updatedList, currentUserId);
       });
+    });
+
+    // Member Departure / Ghost Cleanup
+    const unsubMemberLeft = socketService.onMemberLeft(({ userId }) => {
+      setMembers((prev) => prev.filter((m) => m.id !== userId));
+      setRoutes((prev) => prev.filter((r) => r.forUserId !== userId));
     });
 
     const unsubSOS = socketService.onSOSTriggered((sosMsg) => {
@@ -208,25 +256,6 @@ export const App: React.FC = () => {
       if (data.rendezvous) {
         lastConfirmedRendezvousRef.current = data.rendezvous;
         setRendezvous(data.rendezvous);
-        // If current user is waiting for GPS and still locating, place near approach road so vehicle & route appear immediately
-        setMembers((prev) => {
-          const myIdx = prev.findIndex((m) => m.id === currentUserId);
-          if (myIdx >= 0 && !realLocation && prev[myIdx].status === 'locating' && !prev[myIdx].isLeader) {
-            const copy = [...prev];
-            const approachLoc: LocationData = {
-              lat: +(data.rendezvous.lat - 0.035).toFixed(5),
-              lng: +(data.rendezvous.lng - 0.025).toFixed(5),
-              speed: 35,
-              heading: 25,
-              accuracy: 20,
-              timestamp: Date.now(),
-            };
-            copy[myIdx] = { ...copy[myIdx], location: approachLoc, status: 'active' };
-            socketService.updateLocation(groupId, currentUserId, approachLoc);
-            return copy;
-          }
-          return prev;
-        });
       }
       if (data.routes && data.routes.length > 0) {
         setRoutes((prev) => {
@@ -284,6 +313,7 @@ export const App: React.FC = () => {
     return () => {
       unsubGroupState();
       unsubLocation();
+      unsubMemberLeft();
       unsubSOS();
       unsubRendezvous();
       unsubRoutes();
@@ -423,7 +453,7 @@ export const App: React.FC = () => {
           status: speedKm > 2 ? 'moving' : 'idle',
           lastSeen: Date.now(),
         };
-        return [updated, ...prev.filter((m) => m.id !== currentUserId)];
+        return deduplicateMembers([updated, ...prev.filter((m) => m.id !== currentUserId)], currentUserId);
       });
 
       // Broadcast position to squad
@@ -567,47 +597,15 @@ export const App: React.FC = () => {
     setIsJoined(true);
 
     try {
+      localStorage.setItem('wandersync_user_id', currentUserId);
       localStorage.setItem('wandersync_user_name', data.name);
       localStorage.setItem('wandersync_user_avatar', data.avatar);
       localStorage.setItem('wandersync_user_color', data.color);
       localStorage.setItem('wandersync_user_mode', data.mode);
     } catch (e) {}
 
-    // Guarantee user immediately in group with real location if already fetched, or a smart starting approach
-    let initialLoc = realLocation;
-    if (!initialLoc) {
-      const targetRendezvous = data.initialDestination || rendezvous;
-      const leaderMember = members.find((m) => m.isLeader && m.location);
-      if (targetRendezvous) {
-        // Position on approach road ~3.5km from destination so vehicle & route appear immediately
-        initialLoc = {
-          lat: +(targetRendezvous.lat - (data.isCreator ? 0.045 : 0.035)).toFixed(5),
-          lng: +(targetRendezvous.lng - (data.isCreator ? 0.035 : 0.025)).toFixed(5),
-          speed: 38,
-          heading: 25,
-          accuracy: 15,
-          timestamp: Date.now(),
-        };
-      } else if (leaderMember?.location) {
-        initialLoc = {
-          lat: +(leaderMember.location.lat - 0.035).toFixed(5),
-          lng: +(leaderMember.location.lng - 0.025).toFixed(5),
-          speed: 38,
-          heading: 20,
-          accuracy: 15,
-          timestamp: Date.now(),
-        };
-      } else {
-        initialLoc = {
-          lat: 28.6139,
-          lng: 77.2090,
-          speed: 0,
-          heading: 0,
-          accuracy: 50,
-          timestamp: Date.now(),
-        };
-      }
-    }
+    // Use real GPS if already resolved, otherwise initial status is 'locating' (NO FAKE DELHI COORDINATES)
+    const initialLoc = realLocation;
 
     const initialMember: TravelerMember = {
       ...updatedProfile,
@@ -617,8 +615,37 @@ export const App: React.FC = () => {
       status: realLocation ? 'active' : 'locating',
       lastSeen: Date.now(),
     };
-    setMembers((prev) => [initialMember, ...prev.filter((m) => m.id !== currentUserId)]);
+    setMembers((prev) => deduplicateMembers([initialMember, ...prev.filter((m) => m.id !== currentUserId)], currentUserId));
     socketService.joinGroup(data.groupId, { ...initialMember, isCreator: data.isCreator } as any);
+
+    // If real GPS is pending, resolve regional IP location (e.g. West Bengal) in parallel
+    if (!initialLoc) {
+      fetch('/api/my-location')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((geo) => {
+          if (geo && geo.lat && geo.lng && !realLocation) {
+            const coarseLoc: LocationData = {
+              lat: Number(geo.lat),
+              lng: Number(geo.lng),
+              speed: 0,
+              heading: 0,
+              accuracy: 1000,
+              timestamp: Date.now(),
+            };
+            setMembers((prev) => {
+              const myIdx = prev.findIndex((m) => m.id === currentUserId);
+              if (myIdx >= 0 && !realLocation && prev[myIdx].status === 'locating') {
+                const copy = [...prev];
+                copy[myIdx] = { ...copy[myIdx], location: coarseLoc };
+                return deduplicateMembers(copy, currentUserId);
+              }
+              return prev;
+            });
+            socketService.updateLocation(data.groupId, currentUserId, coarseLoc);
+          }
+        })
+        .catch(() => {});
+    }
 
     // If creator selected an initial destination upfront, set and broadcast it immediately AFTER joining
     if (data.initialDestination) {
