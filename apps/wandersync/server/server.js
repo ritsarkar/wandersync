@@ -247,6 +247,9 @@ io.on('connection', (socket) => {
   // 1. Join or Create Group Room
   socket.on('join_group', async ({ groupId, profile }) => {
     const group = getOrCreateGroup(groupId);
+    if (currentGroupId && currentGroupId !== group.id) {
+      socket.leave(currentGroupId);
+    }
     currentGroupId = group.id;
     // Check if group already has an established creator
     if (!group.creatorId) {

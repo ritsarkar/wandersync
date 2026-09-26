@@ -445,6 +445,10 @@ class SocketService {
         userId: this.savedProfile.id,
         status: 'offline',
       });
+      if (this.mqttClient && this.mqttClient.connected) {
+        const cleanId = this.savedGroupId.toUpperCase().trim();
+        this.mqttClient.unsubscribe(`wandersync/v2/groups/${cleanId}/#`);
+      }
     }
     this.savedGroupId = null;
     this.savedProfile = null;
