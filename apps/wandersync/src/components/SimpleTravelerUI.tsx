@@ -109,6 +109,19 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
 
   const currentUser = members.find((m) => m.id === currentUserId);
 
+  const myRoutes = routes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
+  const myChosenRoute = currentUser?.assignedRouteId
+    ? routes.find((r) => r.id === currentUser.assignedRouteId) || myRoutes[0]
+    : myRoutes[0];
+
+  const formatRouteDuration = (mins?: number) => {
+    if (!mins) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0) return `${h}h ${m > 0 ? `${m}m` : ''}`;
+    return `${m}m`;
+  };
+
   const POPULAR_DESTINATIONS = [
     { name: 'Manali, Himachal Pradesh', icon: '🏔️', lat: 32.2432, lng: 77.1892 },
     { name: 'Shimla, Himachal Pradesh', icon: '⛰️', lat: 31.1048, lng: 77.1734 },
@@ -721,6 +734,21 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
               )}
             </div>
 
+            {/* Primary Desktop Action: Start Convoy (GO) */}
+            {rendezvous && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => onToggleTripActive?.()}
+                  className="apple-pressable w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-[#34C759] via-[#28CD41] to-[#20b837] hover:from-[#2fb350] hover:to-[#22b337] text-slate-950 font-black text-sm tracking-wider shadow-[0_8px_25px_rgba(52,199,89,0.6)] border-2 border-white/50 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all ring-4 ring-emerald-500/25"
+                  title="Start Convoy Journey (GO)"
+                >
+                  <span className="text-lg animate-pulse">🚀</span>
+                  <span className="font-black text-sm uppercase tracking-widest text-slate-950">START CONVOY (GO)</span>
+                </button>
+              </div>
+            )}
+
             {/* Simple Routes Overview (How much time each route takes) */}
             <div className="mt-3.5 pt-3 border-t border-slate-800">
               {(() => {
@@ -1224,7 +1252,7 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
 
             {/* Compact Peek Bar when drawer is collapsed */}
             {!isMobileDrawerOpen && (
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 px-0.5">
                 {/* Left: Location Sharing Toggle */}
                 <button
                   type="button"
@@ -1232,12 +1260,12 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                     e.stopPropagation();
                     onToggleLocationSharing();
                   }}
-                  className={`flex items-center justify-center w-9 h-9 rounded-full border apple-pressable transition ${
+                  className={`flex items-center justify-center w-9 h-9 rounded-full border apple-pressable shrink-0 transition ${
                     isSharingLocation
                       ? 'bg-[#34C759]/20 border-[#34C759]/40'
                       : 'bg-white/10 border-white/15'
                   }`}
-                  title={isSharingLocation ? 'GPS Live' : 'GPS Off'}
+                  title={isSharingLocation ? 'GPS Live: Location active' : 'GPS Off: Location paused'}
                 >
                   <span
                     className={`w-2.5 h-2.5 rounded-full ${
@@ -1247,22 +1275,55 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
                 </button>
 
                 {/* Center: Destination / Status summary */}
-                <div className="min-w-0 flex-1 text-center px-1">
-                  <div className="text-xs font-bold text-white truncate apple-headline">
-                    {rendezvous ? rendezvous.title.replace('🎯 ', '') : 'Set destination'}
+                <div
+                  className="min-w-0 flex-1 px-1 cursor-pointer select-none text-left"
+                  onClick={() => {
+                    if (!rendezvous) {
+                      setIsLocateOpen(true);
+                    } else {
+                      mobileSheet.snapTo('half');
+                    }
+                  }}
+                >
+                  <div className="text-xs font-black text-white truncate apple-headline">
+                    {rendezvous ? rendezvous.title.replace('🎯 ', '') : 'Where to? Set destination'}
                   </div>
+                  {myChosenRoute && rendezvous ? (
+                    <div className="text-[10px] font-mono text-emerald-400 font-bold truncate flex items-center gap-1 mt-0.5">
+                      <span>{formatRouteDuration(myChosenRoute.durationMins)}</span>
+                      {myChosenRoute.distanceKm ? <span>• {myChosenRoute.distanceKm} km</span> : null}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {rendezvous ? 'Route ready' : 'Tap to search destination'}
+                    </div>
+                  )}
                 </div>
 
-                {/* Right: Expand Drawer Button with Slide-Up Arrow */}
-                <button
-                  type="button"
-                  onClick={() => mobileSheet.snapTo('half')}
-                  className="px-3 py-1.5 rounded-full bg-white/10 text-white flex items-center gap-1 border border-white/15 apple-pressable"
-                  title="Slide up for routes & squad"
-                >
-                  <ChevronUp className="w-4 h-4 text-blue-400 animate-bounce" />
-                  <span className="text-[11px] font-bold text-blue-400">Menu</span>
-                </button>
+                {/* Right Actions: Prominent GO Button + Menu Drawer Button */}
+                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {rendezvous && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleTripActive?.()}
+                      className="apple-pressable h-9 px-3.5 rounded-full bg-gradient-to-r from-[#34C759] via-[#28CD41] to-[#20b837] active:from-[#28b248] active:to-[#1aa330] text-slate-950 font-black text-xs tracking-wider shadow-[0_0_20px_rgba(52,199,89,0.85)] border border-white/60 flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-400/40"
+                      title="Start Convoy Journey (GO)"
+                    >
+                      <span className="text-sm animate-pulse">🚀</span>
+                      <span className="font-black text-xs uppercase tracking-widest text-slate-950">GO</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => mobileSheet.snapTo('half')}
+                    className="h-9 px-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center gap-1 border border-white/15 apple-pressable cursor-pointer"
+                    title="Slide up for routes & squad"
+                  >
+                    <ChevronUp className="w-4 h-4 text-blue-400 animate-bounce" />
+                    <span className="text-[11px] font-bold text-blue-400 hidden xs:inline">Menu</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1364,6 +1425,24 @@ export const SimpleTravelerUI: React.FC<SimpleTravelerUIProps> = ({
               {/* TAB 1: ROUTES */}
               {mobileActiveTab === 'routes' && (
                 <div className="space-y-3 pt-1">
+                  {/* Primary GO Action inside Drawer */}
+                  {rendezvous && (
+                    <div className="pb-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          mobileSheet.snapTo('peek');
+                          onToggleTripActive?.();
+                        }}
+                        className="apple-pressable w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-[#34C759] via-[#28CD41] to-[#20b837] active:from-[#28b248] active:to-[#1aa330] text-slate-950 font-black text-sm tracking-wider shadow-[0_4px_20px_rgba(52,199,89,0.6)] border-2 border-white/50 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all ring-4 ring-emerald-500/25"
+                        title="Start Convoy Journey (GO)"
+                      >
+                        <span className="text-lg animate-pulse">🚀</span>
+                        <span className="font-black text-sm uppercase tracking-widest text-slate-950">START CONVOY (GO)</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* User's Route Options */}
                   {(() => {
                     const myRoutes = routes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
