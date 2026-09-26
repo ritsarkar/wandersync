@@ -124,6 +124,7 @@ export const App: React.FC = () => {
   const watchIdRef = useRef<number | null>(null);
   const compassHeadingRef = useRef<number>(0);
   const lastLocRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastConfirmedRendezvousRef = useRef<RendezvousPoint | null>(null);
 
   // Connect to Socket server
   useEffect(() => {
@@ -132,8 +133,20 @@ export const App: React.FC = () => {
     // Group state from server (ONLY contains real members who joined this room code)
     const unsubGroupState = socketService.onGroupState((group: TravelGroup) => {
       setMembers(group.members);
-      if (group.routes && group.routes.length > 0) setRoutes(group.routes);
-      if (group.rendezvous) setRendezvous(group.rendezvous);
+      if (group.routes && group.routes.length > 0) {
+        setRoutes((prev) => {
+          // Only accept if incoming has at least as many user routes as we already have
+          const incomingUserIds = new Set(group.routes.filter((r: any) => r.forUserId).map((r: any) => r.forUserId));
+          const prevUserIds = new Set(prev.filter((r) => r.forUserId).map((r) => r.forUserId));
+          // Keep routes for users NOT in incoming set (they may not have been recalculated yet)
+          const preserved = prev.filter((r) => r.forUserId && !incomingUserIds.has(r.forUserId));
+          return [...preserved, ...group.routes];
+        });
+      }
+      if (group.rendezvous) {
+        lastConfirmedRendezvousRef.current = group.rendezvous;
+        setRendezvous(group.rendezvous);
+      }
       if (group.waypoints) setWaypoints(group.waypoints);
       if (typeof (group as any).isTripActive === 'boolean') {
         setIsTripActive((group as any).isTripActive);
@@ -193,11 +206,12 @@ export const App: React.FC = () => {
 
     const unsubRendezvous = socketService.onRendezvousUpdated((data) => {
       if (data.rendezvous) {
+        lastConfirmedRendezvousRef.current = data.rendezvous;
         setRendezvous(data.rendezvous);
         // If current user is waiting for GPS and still locating, place near approach road so vehicle & route appear immediately
         setMembers((prev) => {
           const myIdx = prev.findIndex((m) => m.id === currentUserId);
-          if (myIdx >= 0 && (!realLocation || prev[myIdx].status === 'locating')) {
+          if (myIdx >= 0 && !realLocation && prev[myIdx].status === 'locating' && !prev[myIdx].isLeader) {
             const copy = [...prev];
             const approachLoc: LocationData = {
               lat: +(data.rendezvous.lat - 0.035).toFixed(5),
@@ -248,6 +262,10 @@ export const App: React.FC = () => {
     });
 
     const unsubPermission = socketService.onPermissionDenied(({ message }) => {
+      // Revert to last server-confirmed rendezvous
+      if (lastConfirmedRendezvousRef.current) {
+        setRendezvous(lastConfirmedRendezvousRef.current);
+      }
       alert(message);
     });
 
@@ -612,7 +630,11 @@ export const App: React.FC = () => {
         timestamp: Date.now(),
       };
       setRendezvous(initialRendezvous);
-      socketService.setRendezvous(data.groupId, initialRendezvous, currentUserId);
+      lastConfirmedRendezvousRef.current = initialRendezvous;
+      // Delay setRendezvous to ensure join_group is processed first on the server
+      setTimeout(() => {
+        socketService.setRendezvous(data.groupId, initialRendezvous, currentUserId);
+      }, 350);
     }
 
     // Request real browser GPS permission & start tracking

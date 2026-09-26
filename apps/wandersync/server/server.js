@@ -333,16 +333,13 @@ io.on('connection', (socket) => {
 
     group.members.set(currentUserId, memberData);
 
-    // 1. Immediately push destination and group state directly to the joining socket (0ms latency!)
+    // 1. Immediately push destination to the joining socket (0ms latency!)
     if (group.rendezvous) {
       socket.emit('rendezvous_updated', {
         rendezvous: group.rendezvous,
         routes: group.routes || [],
       });
     }
-
-    // Broadcast updated group state to room
-    io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
 
     // Broadcast member initial location so friend's vehicle marker appears on everyone's map at 0ms
     io.to(currentGroupId).emit('member_location_updated', {
@@ -368,9 +365,12 @@ io.on('connection', (socket) => {
     };
     group.messages.push(joinMsg);
     io.to(currentGroupId).emit('new_message', joinMsg);
+
+    // Send initial group state WITHOUT waiting for routes (so member list updates)
+    io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
     scheduleSaveGroups(groups);
 
-    // 2. Asynchronously in background: compute road routes for joining member if they have a location
+    // 2. Asynchronously compute road routes for joining member, THEN broadcast updated state
     if (group.rendezvous && memberData.location) {
       getGoogleRoutes(
         memberData.location.lat,
@@ -400,6 +400,7 @@ io.on('connection', (socket) => {
             ];
             io.to(currentGroupId).emit('member_route_updated', { userId: memberData.id, routeId: memberData.assignedRouteId });
             io.to(currentGroupId).emit('routes_updated', group.routes);
+            // Now broadcast the complete group state WITH routes included
             io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
             scheduleSaveGroups(groups);
           }
@@ -751,7 +752,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    group.isTripActive = true;
+    // Don't activate trip during countdown - wait for explicit set_trip_active after countdown completes
+    // group.isTripActive = true; // REMOVED - causes late joiners to skip countdown
     const starterName = profile?.name || 'Squad Member';
     const starterId = profile?.id || currentUserId;
 
@@ -786,9 +788,13 @@ io.on('connection', (socket) => {
     const group = groups.get(targetGroupId);
     if (!group) return;
 
+    group.isTripActive = false;
     io.to(group.id).emit('trip_countdown_cancelled', {
       cancelledBy: profile?.name || 'Squad Member',
     });
+    io.to(group.id).emit('trip_active_updated', { isTripActive: false });
+    io.to(group.id).emit('group_state_updated', serializeGroup(group));
+    scheduleSaveGroups(groups);
   });
 
   socket.on('set_trip_active', ({ groupId, active, isActive }) => {
@@ -836,6 +842,7 @@ io.on('connection', (socket) => {
             userId: currentUserId,
             status: 'offline',
           });
+          io.to(currentGroupId).emit('group_state_updated', serializeGroup(group));
         }
       }
     }

@@ -28,6 +28,7 @@ class SocketService {
   private savedGroupId: string | null = null;
   private savedProfile: Partial<TravelerMember> | null = null;
   private recentEvents: Set<string> = new Set();
+  private rdvVersion: number = 0;
 
   // Internal listener registries for universal dual-transport dispatch
   private groupStateListeners: Set<(group: TravelGroup) => void> = new Set();
@@ -187,6 +188,7 @@ class SocketService {
       ...payload,
       senderId: this.savedProfile?.id,
       _timestamp: Date.now(),
+      _eventId: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
     });
 
     if (!this.mqttClient || !this.mqttClient.connected) {
@@ -203,12 +205,15 @@ class SocketService {
 
   private handleIncomingMqttPayload(topic: string, data: any) {
     if (!data || typeof data !== 'object') return;
-    // Don't process our own broadcast
-    if (data.senderId && this.savedProfile?.id && data.senderId === this.savedProfile.id) {
-      return;
-    }
 
+    // Only filter self-echo for location events (prevents GPS position echo).
+    // Allow routes, rendezvous, group_state etc. through — they carry aggregated multi-user data.
     const event = data.event || (topic.includes('/location/') ? 'member_location_updated' : null);
+    if (data.senderId && this.savedProfile?.id && data.senderId === this.savedProfile.id) {
+      if (event === 'member_location_updated' || event === 'member_joined' || event === 'member_status_updated') {
+        return;
+      }
+    }
     if (!event) return;
 
     // Deduplicate only if explicit unique event ID is provided
@@ -252,6 +257,10 @@ class SocketService {
 
       case 'rendezvous_updated':
         if (data.rendezvous) {
+          // Ignore stale retained rendezvous messages
+          if (typeof data._rdvVersion === 'number' && data._rdvVersion < this.rdvVersion) {
+            return;
+          }
           this.dispatchRendezvous({ rendezvous: data.rendezvous, routes: data.routes || [] });
         }
         break;
@@ -481,11 +490,12 @@ class SocketService {
 
   setRendezvous(groupId: string, rendezvous: RendezvousPoint, userId?: string) {
     const effectiveUserId = userId || this.savedProfile?.id;
+    this.rdvVersion++;
     if (this.socket && this.socket.connected) {
       this.socket.emit('set_rendezvous', { groupId, rendezvous, userId: effectiveUserId });
     }
     // Retain rendezvous so any friend opening the link at any time immediately sees the destination!
-    this.publishMqtt('rendezvous', { event: 'rendezvous_updated', rendezvous, senderId: effectiveUserId }, true);
+    this.publishMqtt('rendezvous', { event: 'rendezvous_updated', rendezvous, senderId: effectiveUserId, _rdvVersion: this.rdvVersion }, true);
   }
 
   claimAdmin(groupId: string) {
