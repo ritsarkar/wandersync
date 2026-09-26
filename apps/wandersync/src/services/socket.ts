@@ -10,6 +10,7 @@ import {
   Waypoint,
   TripCountdownEvent,
 } from '../types';
+import { getSecureMqttChannel, sanitizeText, isValidCoordinate } from '../utils/security';
 
 type LocationCallback = (data: {
   userId: string;
@@ -169,8 +170,8 @@ class SocketService {
     if (!groupId) return;
     this.savedGroupId = groupId;
     if (!this.mqttClient || !this.mqttClient.connected) return;
-    const cleanId = groupId.toUpperCase().trim();
-    const topic = `wandersync/v2/groups/${cleanId}/#`;
+    const channel = getSecureMqttChannel(groupId);
+    const topic = `wandersync/v2/c/${channel}/#`;
     this.mqttClient.subscribe(topic, (err) => {
       if (err) {
         console.warn('[MqttBridge] Subscribe error:', err.message);
@@ -182,8 +183,8 @@ class SocketService {
 
   private publishMqtt(subTopic: string, payload: any, retain: boolean = false) {
     if (!this.savedGroupId) return;
-    const cleanId = this.savedGroupId.toUpperCase().trim();
-    const topic = `wandersync/v2/groups/${cleanId}/${subTopic}`;
+    const channel = getSecureMqttChannel(this.savedGroupId);
+    const topic = `wandersync/v2/c/${channel}/${subTopic}`;
     const serialized = JSON.stringify({
       ...payload,
       senderId: this.savedProfile?.id,
@@ -446,8 +447,8 @@ class SocketService {
         status: 'offline',
       });
       if (this.mqttClient && this.mqttClient.connected) {
-        const cleanId = this.savedGroupId.toUpperCase().trim();
-        this.mqttClient.unsubscribe(`wandersync/v2/groups/${cleanId}/#`);
+        const channel = getSecureMqttChannel(this.savedGroupId);
+        this.mqttClient.unsubscribe(`wandersync/v2/c/${channel}/#`);
       }
     }
     this.savedGroupId = null;
@@ -522,33 +523,41 @@ class SocketService {
   }
 
   sendMessage(groupId: string, message: Omit<GroupMessage, 'id' | 'timestamp'>) {
+    const cleanText = sanitizeText(message.text, 500);
+    const safeSenderName = sanitizeText(message.senderName, 40) || 'Traveler';
     const fullMsg: GroupMessage = {
       ...message,
+      text: cleanText,
+      senderName: safeSenderName,
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       timestamp: Date.now(),
     };
     if (this.socket && this.socket.connected) {
-      this.socket.emit('send_message', { groupId, message });
+      this.socket.emit('send_message', { groupId, message: fullMsg });
     }
     this.publishMqtt('events', { event: 'new_message', message: fullMsg });
   }
 
   triggerSOS(groupId: string, alert: { senderId: string; senderName: string; location: LocationData }) {
+    const safeAlert = {
+      ...alert,
+      senderName: sanitizeText(alert.senderName, 40) || 'Squad Member',
+    };
     if (this.socket && this.socket.connected) {
-      this.socket.emit('trigger_sos', { groupId, alert });
+      this.socket.emit('trigger_sos', { groupId, alert: safeAlert });
     }
-    this.publishMqtt('events', { event: 'sos_triggered', alert });
+    this.publishMqtt('events', { event: 'sos_triggered', alert: safeAlert });
   }
 
   startTripCountdown(groupId: string, profile: Partial<TravelerMember>, durationSeconds: number = 4) {
     const countdownPayload: TripCountdownEvent = {
-      startedBy: profile?.name || 'Squad Member',
+      startedBy: sanitizeText(profile?.name, 40) || 'Squad Member',
       startedById: profile?.id || this.savedProfile?.id || 'admin',
-      durationSeconds,
+      durationSeconds: Math.min(30, Math.max(1, Number(durationSeconds) || 4)),
       timestamp: Date.now(),
     };
     if (this.socket && this.socket.connected) {
-      this.socket.emit('start_trip_countdown', { groupId, profile, durationSeconds });
+      this.socket.emit('start_trip_countdown', { groupId, profile, durationSeconds: countdownPayload.durationSeconds });
     }
     this.publishMqtt('events', { event: 'trip_countdown_started', countdownPayload });
   }
@@ -559,7 +568,7 @@ class SocketService {
     }
     this.publishMqtt('events', {
       event: 'trip_countdown_cancelled',
-      cancelledBy: profile?.name || 'Squad Member',
+      cancelledBy: sanitizeText(profile?.name, 40) || 'Squad Member',
     });
   }
 
@@ -573,11 +582,13 @@ class SocketService {
   addWaypoint(groupId: string, waypoint: Omit<Waypoint, 'id' | 'timestamp'>) {
     const fullWp: Waypoint = {
       ...waypoint,
+      label: sanitizeText(waypoint.label, 80),
+      type: (sanitizeText(waypoint.type, 30) as any) || 'custom',
       id: `wp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       timestamp: Date.now(),
     };
     if (this.socket && this.socket.connected) {
-      this.socket.emit('add_waypoint', { groupId, waypoint });
+      this.socket.emit('add_waypoint', { groupId, waypoint: fullWp });
     }
     this.publishMqtt('events', { event: 'waypoint_added', waypoint: fullWp });
   }

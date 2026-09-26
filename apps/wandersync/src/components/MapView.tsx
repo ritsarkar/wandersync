@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle } from '../types';
+import { escapeHtml } from '../utils/security';
 
 interface MapViewProps {
   members: TravelerMember[];
@@ -137,12 +138,12 @@ export const MapView: React.FC<MapViewProps> = ({
 
       polyline.bindPopup(`
         <div class="text-slate-900 font-sans p-1">
-          <div class="font-bold text-sm text-slate-800">${route.name}</div>
+          <div class="font-bold text-sm text-slate-800">${escapeHtml(route.name)}</div>
           <div class="text-xs text-slate-600 mt-1">
             Distance: <span class="font-semibold text-blue-600">${route.distanceKm} km</span> | 
             ETA: <span class="font-semibold text-emerald-600">${route.durationMins} min</span>
           </div>
-          ${route.tag ? `<div class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">${route.tag}</div>` : ''}
+          ${route.tag ? `<div class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">${escapeHtml(route.tag)}</div>` : ''}
         </div>
       `);
 
@@ -166,7 +167,7 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
           <div class="traveler-tag mt-1 bg-amber-950/90 border-amber-500/50 text-amber-200">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            ${rendezvous.title || 'Meeting Point'}
+            ${escapeHtml(rendezvous.title || 'Meeting Point')}
           </div>
         </div>
       `,
@@ -178,8 +179,8 @@ export const MapView: React.FC<MapViewProps> = ({
     marker.bindPopup(`
       <div class="p-1 text-slate-900 font-sans">
         <h4 class="font-bold text-sm text-amber-600">🎯 Target Destination</h4>
-        <p class="text-xs text-slate-700 font-semibold">${rendezvous.title}</p>
-        <p class="text-[10px] text-slate-500 mt-0.5">Set by: ${rendezvous.setBy}</p>
+        <p class="text-xs text-slate-700 font-semibold">${escapeHtml(rendezvous.title)}</p>
+        <p class="text-[10px] text-slate-500 mt-0.5">Set by: ${escapeHtml(rendezvous.setBy)}</p>
       </div>
     `);
     marker.addTo(rendezvousLayerRef.current);
@@ -223,11 +224,11 @@ export const MapView: React.FC<MapViewProps> = ({
         <div class="traveler-marker-container ${isSelected ? 'scale-110' : ''}">
           ${isMoving ? `<div class="pulse-radar-ring" style="border-color: ${member.color}"></div>` : ''}
           <div class="traveler-avatar-bubble" style="border-color: ${member.color}; ${isSelected ? `box-shadow: 0 0 25px ${member.color}` : ''}">
-            ${member.avatar || vehicleEmoji}
+            ${escapeHtml(member.avatar || vehicleEmoji)}
             <div class="heading-cone" style="transform: translateX(-50%) rotate(${heading}deg); border-bottom-color: ${member.color};"></div>
           </div>
           <div class="traveler-tag">
-            <span class="truncate max-w-[80px]">${isMe ? 'You' : member.name}</span>
+            <span class="truncate max-w-[80px]">${isMe ? 'You' : escapeHtml(member.name)}</span>
             <span class="speed-badge">${Math.round(member.location.speed || 0)} km/h</span>
           </div>
         </div>

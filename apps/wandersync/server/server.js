@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getGoogleRoutes, getOSRMRoute, calculateDistanceKm } from './routingService.js';
 import { loadPersistedGroups, scheduleSaveGroups } from './storage.js';
+import { sanitizeGroupId, isValidCoordinate, sanitizeString, securityHeadersMiddleware } from './security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,7 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
+app.use(securityHeadersMiddleware);
 app.use(express.json({ limit: '1mb' }));
 
 // Serve static frontend assets in production
@@ -28,7 +30,7 @@ const groups = loadPersistedGroups();
  * Get or initialize a travel group
  */
 function getOrCreateGroup(groupId) {
-  const id = (groupId || 'WANDER-SQUAD').toUpperCase().trim();
+  const id = sanitizeGroupId(groupId);
   if (!groups.has(id)) {
     groups.set(id, {
       id,
@@ -58,7 +60,7 @@ function getOrCreateGroup(groupId) {
 
 function getGroup(groupId) {
   if (!groupId) return null;
-  return groups.get(groupId.toString().toUpperCase().trim()) || null;
+  return groups.get(sanitizeGroupId(groupId)) || null;
 }
 
 // Convert group state to client-friendly JSON
@@ -96,8 +98,8 @@ const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyD7TQUFCM4BhUXzW
 
 app.post('/api/routes/calculate', async (req, res) => {
   const { startLat, startLng, endLat, endLng, mode = 'driving' } = req.body;
-  if (startLat == null || startLng == null || endLat == null || endLng == null) {
-    return res.status(400).json({ error: 'Missing coordinates for route calculation' });
+  if (!isValidCoordinate(startLat, startLng) || !isValidCoordinate(endLat, endLng)) {
+    return res.status(400).json({ error: 'Missing or invalid coordinates for route calculation' });
   }
 
   try {
@@ -110,8 +112,8 @@ app.post('/api/routes/calculate', async (req, res) => {
 
 app.post('/api/routes/google', async (req, res) => {
   const { startLat, startLng, endLat, endLng, mode = 'driving' } = req.body;
-  if (startLat == null || startLng == null || endLat == null || endLng == null) {
-    return res.status(400).json({ error: 'Missing coordinates for route calculation' });
+  if (!isValidCoordinate(startLat, startLng) || !isValidCoordinate(endLat, endLng)) {
+    return res.status(400).json({ error: 'Missing or invalid coordinates for route calculation' });
   }
 
   try {
@@ -189,7 +191,11 @@ app.get('/api/places/details', async (req, res) => {
 
   // If it was a Nominatim fallback place
   if (typeof placeId === 'string' && placeId.startsWith('nom-')) {
-    const realId = placeId.replace('nom-', '');
+    const rawId = placeId.replace('nom-', '').replace(/[^0-9a-zA-Z_-]/g, '');
+    const realId = encodeURIComponent(rawId);
+    if (!realId) {
+      return res.status(400).json({ error: 'Invalid placeId' });
+    }
     try {
       const nomRes = await fetch(`https://nominatim.openstreetmap.org/details?format=json&place_id=${realId}`);
       const nomData = await nomRes.json();
@@ -251,29 +257,38 @@ io.on('connection', (socket) => {
       socket.leave(currentGroupId);
     }
     currentGroupId = group.id;
+
+    const safeId = sanitizeString(profile?.id, 64) || `user-${socket.id}`;
+    const safeName = sanitizeString(profile?.name, 40) || 'Anonymous Traveler';
+    const safeAvatar = sanitizeString(profile?.avatar, 10) || '🎒';
+    const safeMode = ['car', 'bike', 'motorcycle', 'walk', 'train'].includes(profile?.mode) ? profile.mode : 'car';
+
     // Check if group already has an established creator
     if (!group.creatorId) {
-      group.creatorId = profile.id;
-    } else if (profile.isCreator && !group.members.has(group.creatorId)) {
-      group.creatorId = profile.id;
+      group.creatorId = safeId;
+    } else if (profile?.isCreator && !group.members.has(group.creatorId)) {
+      group.creatorId = safeId;
     }
 
-    currentUserId = profile.id;
+    currentUserId = safeId;
 
     socket.join(currentGroupId);
 
     // Register or update member
     const existingMember = group.members.get(currentUserId);
-    const hasInitialLoc = Boolean(profile.location || existingMember?.location);
-    const isLeader = group.creatorId === profile.id;
+    const hasInitialLoc = Boolean(
+      (profile?.location && isValidCoordinate(profile.location.lat, profile.location.lng)) || 
+      existingMember?.location
+    );
+    const isLeader = group.creatorId === currentUserId;
 
     // Distinct neon colors for friends: 1st friend = Magenta, 2nd = Amber, 3rd = Purple, etc.
     const SQUAD_FRIEND_PALETTE = ['#ec4899', '#f59e0b', '#8b5cf6', '#10b981', '#f97316', '#3b82f6'];
-    let memberColor = profile.color;
+    let memberColor = profile?.color;
     if (isLeader) {
       memberColor = '#00f0ff'; // Driver/Leader gets Electric Cyan
     } else {
-      const otherFriends = Array.from(group.members.values()).filter((m) => m.id !== group.creatorId && m.id !== profile.id);
+      const otherFriends = Array.from(group.members.values()).filter((m) => m.id !== group.creatorId && m.id !== currentUserId);
       const friendIdx = otherFriends.length;
       if (!memberColor || memberColor === '#3b82f6' || memberColor === '#00f0ff' || memberColor === '#10b981') {
         memberColor = SQUAD_FRIEND_PALETTE[friendIdx % SQUAD_FRIEND_PALETTE.length];
@@ -281,16 +296,16 @@ io.on('connection', (socket) => {
     }
 
     const memberData = {
-      id: profile.id,
-      name: profile.name || 'Anonymous Traveler',
-      avatar: profile.avatar || '🎒',
+      id: currentUserId,
+      name: safeName,
+      avatar: safeAvatar,
       color: memberColor,
-      mode: profile.mode || 'car', // 'car' | 'bike' | 'walk' | 'motorcycle'
+      mode: safeMode,
       isLeader: isLeader,
-      assignedRouteId: profile.assignedRouteId || (existingMember ? existingMember.assignedRouteId : null),
-      location: profile.location || existingMember?.location || null,
+      assignedRouteId: profile?.assignedRouteId || (existingMember ? existingMember.assignedRouteId : null),
+      location: (profile?.location && isValidCoordinate(profile.location.lat, profile.location.lng)) ? profile.location : existingMember?.location || null,
       trail: existingMember?.trail || [],
-      isSimulated: profile.isSimulated || false,
+      isSimulated: Boolean(profile?.isSimulated),
       status: hasInitialLoc ? 'active' : 'locating',
       lastSeen: Date.now(),
       socketId: socket.id,
@@ -416,26 +431,29 @@ io.on('connection', (socket) => {
 
   // 2. High-Frequency Real-Time Location Update
   socket.on('update_location', ({ groupId, userId, location }) => {
+    // Session identity binding: reject attempts to spoof another traveler's position
+    const effectiveUserId = currentUserId || userId;
+    if (userId && currentUserId && userId !== currentUserId) {
+      console.warn(`[Security] Location spoofing attempt blocked: socket ${socket.id} (user ${currentUserId}) tried to update location for ${userId}`);
+      return;
+    }
     const group = getGroup(groupId) || (currentGroupId ? getGroup(currentGroupId) : null);
     if (!group || !location) return;
 
     // Sanity check coordinates to prevent corrupted data
-    if (
-      typeof location.lat !== 'number' ||
-      typeof location.lng !== 'number' ||
-      location.lat < -90 ||
-      location.lat > 90 ||
-      location.lng < -180 ||
-      location.lng > 180
-    ) {
+    if (!isValidCoordinate(location.lat, location.lng)) {
       return;
     }
 
-    const member = group.members.get(userId);
+    const member = group.members.get(effectiveUserId);
     if (member) {
       member.location = {
         ...member.location,
-        ...location,
+        lat: Number(location.lat),
+        lng: Number(location.lng),
+        speed: Number(location.speed) || 0,
+        heading: Number(location.heading) || 0,
+        accuracy: Number(location.accuracy) || 0,
         timestamp: Date.now(),
       };
       member.lastSeen = Date.now();
@@ -444,29 +462,29 @@ io.on('connection', (socket) => {
       if (!member.trail) member.trail = [];
       const lastPoint = member.trail[member.trail.length - 1];
       if (!lastPoint || calculateDistanceKm(lastPoint[0], lastPoint[1], location.lat, location.lng) > 0.01) {
-        member.trail.push([location.lat, location.lng]);
+        member.trail.push([member.location.lat, member.location.lng]);
         if (member.trail.length > 60) member.trail.shift();
       }
 
       // Determine moving status
-      member.status = (location.speed || 0) > 3 ? 'moving' : 'idle';
+      member.status = (member.location.speed || 0) > 3 ? 'moving' : 'idle';
 
       // Broadcast single member position to squad with member metadata
-      io.to(groupId).emit('member_location_updated', {
-        userId,
+      io.to(group.id).emit('member_location_updated', {
+        userId: effectiveUserId,
         name: member.name,
         avatar: member.avatar,
         color: member.color,
         mode: member.mode,
         location: member.location,
         status: member.status,
-        trailPoint: [location.lat, location.lng],
+        trailPoint: [member.location.lat, member.location.lng],
       });
 
       // If group has a rendezvous and this member doesn't have a route or moved significantly (> 1 km), calculate it!
       const shouldCalculateRoute = group.rendezvous && (
         !group.routes ||
-        !group.routes.some(r => r.forUserId === userId) ||
+        !group.routes.some(r => r.forUserId === effectiveUserId) ||
         !member.lastRoutedPos ||
         calculateDistanceKm(member.lastRoutedPos.lat, member.lastRoutedPos.lng, location.lat, location.lng) > 1.0
       );
@@ -498,9 +516,9 @@ io.on('connection', (socket) => {
               ...(group.routes || []).filter(r => r.forUserId !== member.id),
               ...formatted,
             ];
-            io.to(groupId).emit('member_route_updated', { userId: member.id, routeId: member.assignedRouteId });
-            io.to(groupId).emit('routes_updated', group.routes);
-            io.to(groupId).emit('group_state_updated', serializeGroup(group));
+            io.to(group.id).emit('member_route_updated', { userId: member.id, routeId: member.assignedRouteId });
+            io.to(group.id).emit('routes_updated', group.routes);
+            io.to(group.id).emit('group_state_updated', serializeGroup(group));
             scheduleSaveGroups(groups);
           }
         }).catch((err) => console.warn('[Routes] Error calculating route on update_location:', err.message));
@@ -521,7 +539,7 @@ io.on('connection', (socket) => {
     });
 
     // Notify room of full batch
-    io.to(groupId).emit('group_state_updated', serializeGroup(group));
+    io.to(group.id).emit('group_state_updated', serializeGroup(group));
     scheduleSaveGroups(groups);
   });
 
@@ -530,10 +548,16 @@ io.on('connection', (socket) => {
     const group = getGroup(groupId) || (currentGroupId ? getGroup(currentGroupId) : null);
     if (!group) return;
 
-    const member = group.members.get(userId);
+    const targetUserId = userId || currentUserId;
+    if (targetUserId !== currentUserId && group.creatorId !== currentUserId) {
+      console.warn(`[Security] Unauthorized assign_route blocked for socket ${socket.id}`);
+      return;
+    }
+
+    const member = group.members.get(targetUserId);
     if (member) {
-      member.assignedRouteId = routeId;
-      io.to(group.id).emit('member_route_updated', { userId, routeId });
+      member.assignedRouteId = routeId ? sanitizeString(routeId, 64) : null;
+      io.to(group.id).emit('member_route_updated', { userId: targetUserId, routeId: member.assignedRouteId });
       io.to(group.id).emit('group_state_updated', serializeGroup(group));
       scheduleSaveGroups(groups);
     }
@@ -543,6 +567,10 @@ io.on('connection', (socket) => {
   socket.on('set_rendezvous', async ({ groupId, rendezvous, recalculateRoutes, userId }) => {
     const group = getOrCreateGroup(groupId);
     const effectiveUserId = currentUserId || userId;
+
+    if (!rendezvous || !isValidCoordinate(rendezvous.lat, rendezvous.lng)) {
+      return;
+    }
 
     const currentCreator = group.creatorId ? group.members.get(group.creatorId) : null;
     const isCreatorOnline = currentCreator && currentCreator.status !== 'offline' && !currentCreator.isSimulated;
@@ -561,7 +589,11 @@ io.on('connection', (socket) => {
     }
 
     group.rendezvous = {
-      ...rendezvous,
+      lat: Number(rendezvous.lat),
+      lng: Number(rendezvous.lng),
+      title: sanitizeString(rendezvous.title, 80) || 'Target Destination',
+      address: sanitizeString(rendezvous.address, 120),
+      setBy: sanitizeString(rendezvous.setBy || 'Admin', 40),
       timestamp: Date.now(),
     };
 
@@ -641,29 +673,34 @@ io.on('connection', (socket) => {
 
   // Claim or Transfer Admin Role
   socket.on('claim_admin', ({ groupId }) => {
-    const group = groups.get(groupId);
+    const group = groups.get(sanitizeGroupId(groupId));
     if (!group) return;
     const currentCreator = group.creatorId ? group.members.get(group.creatorId) : null;
-    const isCurrentCreatorOnline = currentCreator && currentCreator.status !== 'offline' && !currentCreator.isSimulated && currentCreator.id !== currentUserId;
-    if (!isCurrentCreatorOnline || group.members.size <= 1) {
+    const isCreatorRecentlyActive = currentCreator && (Date.now() - (currentCreator.lastSeen || 0) < 15 * 60 * 1000);
+    if (!isCreatorRecentlyActive || group.members.size <= 1) {
       group.creatorId = currentUserId;
       for (const [mId, m] of group.members.entries()) {
         m.isLeader = (mId === currentUserId);
       }
-      io.to(groupId).emit('group_state_updated', serializeGroup(group));
+      io.to(group.id).emit('group_state_updated', serializeGroup(group));
       scheduleSaveGroups(groups);
+    } else {
+      socket.emit('permission_denied', { message: 'Trip creator is currently active. Admin role cannot be seized.' });
     }
   });
 
   socket.on('add_waypoint', ({ groupId, waypoint }) => {
-    const group = groups.get(groupId);
-    if (!group) return;
+    const group = groups.get(sanitizeGroupId(groupId));
+    if (!group || !waypoint || !isValidCoordinate(waypoint.lat, waypoint.lng)) return;
     
     if (!group.waypoints) group.waypoints = [];
     
     const wpObj = {
       id: `wp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      ...waypoint,
+      lat: Number(waypoint.lat),
+      lng: Number(waypoint.lng),
+      type: sanitizeString(waypoint.type, 30) || 'custom',
+      label: sanitizeString(waypoint.label, 80) || 'Waypoint',
       addedBy: currentUserId,
       timestamp: Date.now(),
     };
@@ -671,12 +708,12 @@ io.on('connection', (socket) => {
     group.waypoints.push(wpObj);
     if (group.waypoints.length > 50) group.waypoints.shift();
     
-    io.to(groupId).emit('waypoint_added', wpObj);
+    io.to(group.id).emit('waypoint_added', wpObj);
     scheduleSaveGroups(groups);
   });
 
   socket.on('remove_waypoint', ({ groupId, waypointId }) => {
-    const group = groups.get(groupId);
+    const group = groups.get(sanitizeGroupId(groupId));
     if (!group || !group.waypoints) return;
     
     // Only leader or the person who added can remove
@@ -685,13 +722,13 @@ io.on('connection', (socket) => {
     if (wp.addedBy !== currentUserId && group.creatorId !== currentUserId) return;
     
     group.waypoints = group.waypoints.filter(w => w.id !== waypointId);
-    io.to(groupId).emit('waypoint_removed', { waypointId });
+    io.to(group.id).emit('waypoint_removed', { waypointId });
     scheduleSaveGroups(groups);
   });
 
   // 6. Sync Routes List with Safe Per-Traveler Merging
   socket.on('set_routes', ({ groupId, routes, userId }) => {
-    const group = groups.get(groupId);
+    const group = groups.get(sanitizeGroupId(groupId));
     if (!group) return;
 
     const targetUserId = userId || currentUserId;
@@ -703,67 +740,83 @@ io.on('connection', (socket) => {
       const incomingUserIds = new Set(incoming.map((r) => r.forUserId));
       const otherRoutes = (group.routes || []).filter((r) => !r.forUserId || !incomingUserIds.has(r.forUserId));
       group.routes = [...otherRoutes, ...incoming];
-      io.to(groupId).emit('routes_updated', group.routes);
-      io.to(groupId).emit('group_state_updated', serializeGroup(group));
+      io.to(group.id).emit('routes_updated', group.routes);
+      io.to(group.id).emit('group_state_updated', serializeGroup(group));
       scheduleSaveGroups(groups);
     }
   });
 
   // 7. Chat Messages & Quick Radar Pings
   socket.on('send_message', ({ groupId, message }) => {
-    const group = groups.get(groupId);
-    if (!group) return;
+    const group = groups.get(sanitizeGroupId(groupId));
+    if (!group || !message || typeof message.text !== 'string') return;
+
+    const cleanText = sanitizeString(message.text, 500);
+    if (!cleanText) return;
+
+    const senderMember = currentUserId ? group.members.get(currentUserId) : null;
 
     const msgObj = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      ...message,
+      senderId: currentUserId || 'traveler',
+      senderName: senderMember ? senderMember.name : (sanitizeString(message.senderName, 40) || 'Traveler'),
+      senderColor: senderMember ? senderMember.color : (message.senderColor || '#3b82f6'),
+      text: cleanText,
+      type: message.type === 'system' ? 'chat' : (message.type || 'chat'),
       timestamp: Date.now(),
     };
 
     group.messages.push(msgObj);
     if (group.messages.length > 100) group.messages.shift();
 
-    io.to(groupId).emit('new_message', msgObj);
+    io.to(group.id).emit('new_message', msgObj);
   });
 
   // 8. Emergency SOS Alert
   socket.on('trigger_sos', ({ groupId, alert }) => {
-    const group = groups.get(groupId);
+    const group = groups.get(sanitizeGroupId(groupId));
     if (!group) return;
+
+    const senderMember = currentUserId ? group.members.get(currentUserId) : null;
+    const effectiveLoc = alert?.location && isValidCoordinate(alert.location.lat, alert.location.lng)
+      ? alert.location
+      : senderMember?.location;
+
+    if (!effectiveLoc) return;
+
+    const senderName = senderMember ? senderMember.name : (sanitizeString(alert?.senderName, 40) || 'Squad Member');
 
     const sosMsg = {
       id: `sos-${Date.now()}`,
-      senderId: alert.senderId,
-      senderName: alert.senderName,
+      senderId: currentUserId,
+      senderName: senderName,
       senderColor: '#ef4444',
-      text: `🚨 SOS EMERGENCY BEACON! ${alert.senderName} signaled for help at [${alert.location.lat.toFixed(4)}, ${alert.location.lng.toFixed(4)}]!`,
+      text: `🚨 SOS EMERGENCY BEACON! ${senderName} signaled for help at [${effectiveLoc.lat.toFixed(4)}, ${effectiveLoc.lng.toFixed(4)}]!`,
       type: 'sos',
-      location: alert.location,
+      location: effectiveLoc,
       timestamp: Date.now(),
     };
 
     group.messages.push(sosMsg);
-    io.to(groupId).emit('sos_triggered', sosMsg);
+    io.to(group.id).emit('sos_triggered', sosMsg);
   });
 
   // 9. Synchronized Convoy Trip Start & Countdown
   socket.on('start_trip_countdown', ({ groupId, profile, durationSeconds = 4 }) => {
-    const targetGroupId = (groupId || currentGroupId || '').toUpperCase().trim();
+    const targetGroupId = sanitizeGroupId(groupId || currentGroupId);
     const group = groups.get(targetGroupId);
     if (!group) {
       console.warn('[Countdown] Group not found:', targetGroupId);
       return;
     }
 
-    // Don't activate trip during countdown - wait for explicit set_trip_active after countdown completes
-    // group.isTripActive = true; // REMOVED - causes late joiners to skip countdown
-    const starterName = profile?.name || 'Squad Member';
-    const starterId = profile?.id || currentUserId;
+    const starterName = sanitizeString(profile?.name, 40) || 'Squad Member';
+    const starterId = currentUserId || profile?.id;
 
     const eventPayload = {
       startedBy: starterName,
       startedById: starterId,
-      durationSeconds: Number(durationSeconds) || 4,
+      durationSeconds: Math.min(30, Math.max(1, Number(durationSeconds) || 4)),
       timestamp: Date.now(),
     };
 
@@ -787,13 +840,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('cancel_trip_countdown', ({ groupId, profile }) => {
-    const targetGroupId = (groupId || currentGroupId || '').toUpperCase().trim();
+    const targetGroupId = sanitizeGroupId(groupId || currentGroupId);
     const group = groups.get(targetGroupId);
     if (!group) return;
 
     group.isTripActive = false;
     io.to(group.id).emit('trip_countdown_cancelled', {
-      cancelledBy: profile?.name || 'Squad Member',
+      cancelledBy: sanitizeString(profile?.name, 40) || 'Squad Member',
     });
     io.to(group.id).emit('trip_active_updated', { isTripActive: false });
     io.to(group.id).emit('group_state_updated', serializeGroup(group));
@@ -801,7 +854,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('set_trip_active', ({ groupId, active, isActive }) => {
-    const targetGroupId = (groupId || currentGroupId || '').toUpperCase().trim();
+    const targetGroupId = sanitizeGroupId(groupId || currentGroupId);
     const group = groups.get(targetGroupId);
     if (!group) return;
 

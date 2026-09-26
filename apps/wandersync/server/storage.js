@@ -49,15 +49,17 @@ export function loadPersistedGroups() {
 }
 
 /**
- * Debounced persistence to avoid disk thrashing during rapid GPS updates
+ * Debounced persistence to avoid disk thrashing during rapid GPS updates.
+ * Hardened with atomic temp file rename and prototype pollution defenses.
  */
 export function scheduleSaveGroups(groupsMap) {
   if (saveTimeout) clearTimeout(saveTimeout);
 
   saveTimeout = setTimeout(() => {
     try {
-      const exportObj = {};
+      const exportObj = Object.create(null);
       for (const [id, grp] of groupsMap.entries()) {
+        if (!id || id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
         exportObj[id] = {
           id: grp.id,
           name: grp.name,
@@ -69,7 +71,9 @@ export function scheduleSaveGroups(groupsMap) {
         };
       }
 
-      fs.writeFileSync(FILE_PATH, JSON.stringify(exportObj, null, 2), 'utf-8');
+      const tempPath = `${FILE_PATH}.tmp.${Date.now()}`;
+      fs.writeFileSync(tempPath, JSON.stringify(exportObj, null, 2), 'utf-8');
+      fs.renameSync(tempPath, FILE_PATH);
     } catch (err) {
       console.warn('[Storage] Failed to persist groups to disk:', err.message);
     }

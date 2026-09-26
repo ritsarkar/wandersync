@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR, CandidateSearchLocation, getDeterministicMemberColor } from '../types';
 import { CornerUpLeft, CornerUpRight, Navigation } from 'lucide-react';
+import { escapeHtml } from '../utils/security';
 
 // Pure client-side haversine distance helper
 function calcDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -183,14 +184,14 @@ function getFriendOverlayClass() {
               <div class="v2v-radar-pulse"></div>
               <div class="v2v-radar-pulse-outer"></div>
               <div class="traveler-avatar-bubble" style="border-color: #ef4444; box-shadow: 0 0 24px rgba(239, 68, 68, 0.85); background: #080a10;">
-                ${this.member.avatar || (this.member.mode === 'motorcycle' ? '🏍️' : '🚗')}
+                ${escapeHtml(this.member.avatar || (this.member.mode === 'motorcycle' ? '🏍️' : '🚗'))}
                 <div class="heading-cone-wrapper" style="transform: rotate(${heading}deg);">
                   <div class="heading-cone-arrow" style="border-bottom-color: #ef4444;"></div>
                 </div>
               </div>
               <div class="mt-1.5 px-2.5 py-0.5 rounded-full bg-slate-950/95 border border-red-500/80 text-red-400 text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap z-20">
                 <span class="text-xs text-red-400 animate-pulse">⚠️</span>
-                <span>${this.member.name}</span>
+                <span>${escapeHtml(this.member.name)}</span>
                 <span class="text-slate-400 font-normal">(${speed} km/h)</span>
               </div>
             </div>
@@ -204,13 +205,13 @@ function getFriendOverlayClass() {
         <div class="traveler-marker-container ${this.isSelected ? 'scale-110' : ''}">
           ${isMoving ? `<div class="pulse-radar-ring" style="border-color: ${this.member.color}"></div>` : ''}
           <div class="traveler-avatar-bubble" style="border-color: ${this.member.color}; ${this.isSelected ? `box-shadow: 0 0 25px ${this.member.color}` : ''}">
-            ${this.member.avatar || '🚗'}
+            ${escapeHtml(this.member.avatar || '🚗')}
             <div class="heading-cone-wrapper" style="transform: rotate(${heading}deg);">
               <div class="heading-cone-arrow" style="border-bottom-color: ${this.member.color};"></div>
             </div>
           </div>
           <div class="traveler-tag">
-            <span class="truncate max-w-[80px]">${this.isMe ? 'You' : this.member.name}</span>
+            <span class="truncate max-w-[80px]">${this.isMe ? 'You' : escapeHtml(this.member.name)}</span>
             <span class="speed-badge">${speed} km/h</span>
           </div>
         </div>
@@ -1432,7 +1433,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               📍
             </div>
             <div class="mt-1 px-3 py-1 rounded-full bg-slate-900/95 border border-amber-400 text-amber-300 text-[11px] font-bold whitespace-nowrap shadow-xl">
-              🎯 ${rendezvous.title || 'Meeting Spot'}
+              🎯 ${escapeHtml(rendezvous.title || 'Meeting Spot')}
             </div>
           </div>
         `;
@@ -1639,7 +1640,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-300'
                 : 'bg-slate-950/95 border-cyan-500/50 text-cyan-200'
             } border text-[11px] font-bold whitespace-nowrap shadow-xl flex items-center gap-1.5 backdrop-blur-md">
-              <span>${this.item.name}</span>
+              <span>${escapeHtml(this.item.name)}</span>
               ${
                 isChosen
                   ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>'
@@ -1953,7 +1954,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                 ${icon}
               </div>
               <div style="margin-top: 3px; padding: 2px 7px; border-radius: 9999px; background: rgba(5,8,14,0.92); border: 1.5px solid ${color}; color: #ffffff; font-size: 9px; font-weight: 800; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 8px rgba(0,0,0,0.6); text-transform: uppercase; letter-spacing: 0.04em;">
-                ${wp.label}
+                ${escapeHtml(wp.label)}
               </div>
             </div>
           `;
@@ -1962,8 +1963,8 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             const infoWindow = new google.maps.InfoWindow({
               content: `
                 <div style="font-family: sans-serif; padding: 4px; color: #0f172a;">
-                  <div style="font-weight: 700; font-size: 13px;">${icon} ${wp.label}</div>
-                  <div style="font-size: 11px; color: #475569; margin-top: 2px;">Added by ${wp.addedByName || 'Team member'}</div>
+                  <div style="font-weight: 700; font-size: 13px;">${icon} ${escapeHtml(wp.label)}</div>
+                  <div style="font-size: 11px; color: #475569; margin-top: 2px;">Added by ${escapeHtml(wp.addedByName || 'Team member')}</div>
                   <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">${new Date(wp.timestamp).toLocaleTimeString()}</div>
                 </div>
               `,
