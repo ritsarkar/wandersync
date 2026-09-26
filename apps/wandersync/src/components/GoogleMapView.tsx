@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { TravelerMember, TravelRoute, RendezvousPoint, MapTileStyle, Waypoint, SQUAD_FRIEND_PALETTE, DRIVER_PRIMARY_COLOR, CandidateSearchLocation, getDeterministicMemberColor } from '../types';
-import { CornerUpLeft, CornerUpRight, Navigation, LocateFixed } from 'lucide-react';
+import { CornerUpLeft, CornerUpRight, Navigation } from 'lucide-react';
 
 // Pure client-side haversine distance helper
 function calcDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -314,7 +314,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const isManualNavRef = useRef(false);
   const isProgrammaticCameraChangeRef = useRef(false);
 
-  // Re-center camera onto the driver smoothly
+  // Re-center camera onto the driver smoothly (Google Maps Style)
   const recenterOnDriver = useCallback(() => {
     isManualNavRef.current = false;
     setIsManualNav(false);
@@ -322,7 +322,8 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     if (myMember?.location && mapInstanceRef.current) {
       isProgrammaticCameraChangeRef.current = true;
       mapInstanceRef.current.panTo({ lat: myMember.location.lat, lng: myMember.location.lng });
-      mapInstanceRef.current.setZoom(18.5);
+      const targetZoom = isTripActive ? 18.5 : 16;
+      mapInstanceRef.current.setZoom(targetZoom);
       try {
         if (isTripActive && typeof (mapInstanceRef.current as any).setTilt === 'function') {
           (mapInstanceRef.current as any).setTilt(55);
@@ -334,8 +335,11 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       setTimeout(() => {
         isProgrammaticCameraChangeRef.current = false;
       }, 400);
+    } else if (rendezvous && mapInstanceRef.current) {
+      mapInstanceRef.current.panTo({ lat: rendezvous.lat, lng: rendezvous.lng });
+      mapInstanceRef.current.setZoom(14);
     }
-  }, [members, currentUserId, isTripActive]);
+  }, [members, currentUserId, isTripActive, rendezvous]);
 
   // Pointing Pin on Main Map: human-centric direct road spot marking
   const [internalPointingPinMode, setInternalPointingPinMode] = useState<boolean>(false);
@@ -1115,9 +1119,22 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
     const myAssignedRouteId = myMember?.assignedRouteId;
 
     const myRoutesList = displayRoutes.filter((r) => !r.forUserId || r.forUserId === currentUserId);
-    const myChosenRoute = myAssignedRouteId
-      ? myRoutesList.find((r) => r.id === myAssignedRouteId) || myRoutesList[0]
-      : myRoutesList[0];
+    let myChosenRoute = myAssignedRouteId
+      ? myRoutesList.find((r) => r.id === myAssignedRouteId) || displayRoutes.find((r) => r.id === myAssignedRouteId)
+      : null;
+
+    if (!myChosenRoute && myAssignedRouteId && myRoutesList.length > 0) {
+      const matchIdx = myAssignedRouteId.match(/-(\d+)$/);
+      if (matchIdx) {
+        const idx = parseInt(matchIdx[1], 10) - 1;
+        if (myRoutesList[idx]) {
+          myChosenRoute = myRoutesList[idx];
+        }
+      }
+    }
+    if (!myChosenRoute) {
+      myChosenRoute = myRoutesList[0];
+    }
 
     const otherFriends = members.filter((m) => m.id !== currentUserId);
 
@@ -2221,7 +2238,10 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           }`}
           title="Re-center on my location (Google Maps)"
         >
-          <LocateFixed className="w-5 h-5 stroke-[2.2]" />
+          {/* Authentic Google Maps My Location Crosshair SVG */}
+          <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
+            <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+          </svg>
         </button>
       </div>
 
